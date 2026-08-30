@@ -1,0 +1,161 @@
+<svg viewBox="0 0 1200 800" width="1200" height="800" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <!-- Gradients -->
+    <linearGradient id="stairs-grad" x1="0%" y1="100%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#002869" />
+      <stop offset="35%" stop-color="#0052a3" />
+      <stop offset="65%" stop-color="#008040" />
+      <stop offset="100%" stop-color="#00a63f" />
+    </linearGradient>
+
+    <linearGradient id="ring-grad" x1="0%" y1="100%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#002869" />
+      <stop offset="50%" stop-color="#0055b3" />
+      <stop offset="100%" stop-color="#00a63f" />
+    </linearGradient>
+
+    <filter id="subtle-shadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="4" stdDeviation="6" flood-opacity="0.08" />
+    </filter>
+  </defs>
+
+  <rect width="1200" height="800" fill="#ffffff" />
+
+  <!-- TOP ARTWORK: CLIMBER, GUIDE, STAIRS & FLAG -->
+  <g transform="translate(350, 80)">
+    
+    <!-- 4 Stair Steps on Curved Baseline -->
+    <!-- Curved Base Arc -->
+    <path d="M -30 420 Q 150 435 380 390 L 380 395 Q 150 440 -30 425 Z" fill="#002869" opacity="0.9" />
+
+    <!-- Step 1: Deep Navy Blue -->
+    <path d="M 20 370 L 100 358 L 100 420 Q 55 427 20 424 Z" fill="#002869" />
+
+    <!-- Step 2: Medium Navy Blue -->
+    <path d="M 105 315 L 180 302 L 180 412 L 105 420 Z" fill="#004494" />
+
+    <!-- Step 3: Deep Teal / Forest Green -->
+    <path d="M 185 245 L 265 230 L 265 400 L 185 412 Z" fill="#007a38" />
+
+    <!-- Step 4: Vibrant Green (Top Platform) -->
+    <path d="M 270 160 L 375 145 L 375 391 Q 320 397 270 400 Z" fill="#00a63f" />
+
+    <!-- Flagpole and Green Flag on Step 4 -->
+    <line x1="355" y1="145" x2="355" y2="15" stroke="#00a63f" stroke-width="7" stroke-linecap="round" />
+    <path d="M 355 20 Q 420 30 470 15 Q 430 65 355 80 Z" fill="#00a63f" />
+
+    <!-- LEFT PERSON: The Climber (Blue) -->
+    <!-- Head -->
+    <circle cx="35" cy="150" r="28" fill="#0038a8" />
+    <!-- Body & Arms -->
+    <path d="M 35 185 
+             C 10 205 -5 240 -15 285 
+             C -18 300 -10 308 -3 300 
+             C 12 265 25 240 32 225
+             L 28 320
+             C 25 345 5 390 -5 410
+             C -8 418 -2 422 6 418
+             C 25 395 50 350 55 315
+             L 65 270
+             L 92 315
+             L 92 375
+             C 92 388 112 388 112 375
+             L 112 300
+             C 112 285 95 255 78 235
+             L 125 180
+             C 133 170 125 158 115 166
+             L 55 210
+             C 45 200 40 190 35 185 Z" 
+          fill="#0038a8" />
+
+    <!-- Clasping Point at hands -->
+    <!-- Arm reach from Blue Person to Green Person -->
+    <path d="M 55 205 L 138 148 C 145 142 153 148 148 155 L 68 218 Z" fill="#0038a8" />
+
+    <!-- RIGHT PERSON: The Mentor / Guide (Green) -->
+    <!-- Head -->
+    <circle cx="210" cy="45" r="28" fill="#00a63f" />
+    <!-- Body & Arms -->
+    <path d="M 205 80 
+             C 185 95 160 125 140 148
+             C 135 155 142 162 150 155
+             L 182 118
+             L 190 190
+             L 185 275
+             C 183 290 203 290 205 275
+             L 210 205
+             L 245 245
+             L 285 305
+             C 295 318 312 305 302 290
+             L 260 230
+             L 245 170
+             C 270 200 295 240 300 250
+             C 308 260 320 250 312 240
+             C 295 215 255 130 230 95
+             C 220 85 215 80 205 80 Z" 
+          fill="#00a63f" />
+
+  </g>
+
+  <!-- MIDDLE ROW: WORDMARK "CareerBuddies" -->
+  <g transform="translate(600, 610)" text-anchor="middle">
+    <text font-family="'Plus Jakarta Sans', 'Inter', 'Segoe UI', sans-serif" font-size="140" font-weight="900" letter-spacing="-2">
+      <tspan fill="#002869" dx="-240">Career</tspan><tspan fill="#00a63f" dx="10">Buddies</tspan>
+    </text>
+  </g>
+
+  <!-- BOTTOM ROW: TAGLINE "— Your Career | 🤝 | Our Guidance —" -->
+  <g transform="translate(600, 715)">
+    <!-- Left Navy Blue Accent Line -->
+    <line x1="-510" y1="-10" x2="-400" y2="-10" stroke="#002869" stroke-width="6" stroke-linecap="round" />
+
+    <!-- "Your Career" Text -->
+    <text x="-250" y="2" 
+          text-anchor="middle" 
+          font-family="'Plus Jakarta Sans', 'Inter', 'Segoe UI', sans-serif" 
+          font-size="42" 
+          font-weight="700" 
+          fill="#002869" 
+          letter-spacing="0.5">
+      Your Career
+    </text>
+
+    <!-- Left Separator -->
+    <text x="-80" y="2" text-anchor="middle" font-family="sans-serif" font-size="44" font-weight="300" fill="#002869" opacity="0.4">|</text>
+
+    <!-- CENTER HANDSHAKE CIRCULAR EMBLEM -->
+    <g transform="translate(0, -10)">
+      <!-- Circular Border Ring (Blue & Green Gradient) -->
+      <circle cx="0" cy="0" r="32" fill="none" stroke="url(#ring-grad)" stroke-width="4" />
+
+      <!-- Left Blue Hand -->
+      <path d="M -20 5 L -10 -2 C -7 -4 -4 -3 -2 -1 L 2 3" fill="none" stroke="#002869" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round" />
+      <path d="M -18 11 L -9 4" fill="none" stroke="#002869" stroke-width="3" stroke-linecap="round" />
+      
+      <!-- Right Green Hand -->
+      <path d="M 20 5 L 10 -2 C 7 -4 4 -3 2 -1 L -2 3" fill="none" stroke="#00a63f" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round" />
+      <path d="M 18 11 L 9 4" fill="none" stroke="#00a63f" stroke-width="3" stroke-linecap="round" />
+
+      <!-- Clasped Fingers Clasp in Center -->
+      <path d="M -4 3 C -2 1 2 1 4 3 L 6 6 C 7 8 5 10 3 10 L -3 10 C -5 10 -7 8 -6 6 Z" fill="#002869" opacity="0.1" stroke="#002869" stroke-width="2.5" stroke-linecap="round" />
+      <path d="M -1 5 L 1 7" fill="none" stroke="#00a63f" stroke-width="2.5" stroke-linecap="round" />
+    </g>
+
+    <!-- Right Separator -->
+    <text x="80" y="2" text-anchor="middle" font-family="sans-serif" font-size="44" font-weight="300" fill="#002869" opacity="0.4">|</text>
+
+    <!-- "Our Guidance" Text -->
+    <text x="260" y="2" 
+          text-anchor="middle" 
+          font-family="'Plus Jakarta Sans', 'Inter', 'Segoe UI', sans-serif" 
+          font-size="42" 
+          font-weight="700" 
+          fill="#002869" 
+          letter-spacing="0.5">
+      Our Guidance
+    </text>
+
+    <!-- Right Green Accent Line -->
+    <line x1="410" y1="-10" x2="520" y2="-10" stroke="#00a63f" stroke-width="6" stroke-linecap="round" />
+  </g>
+</svg>

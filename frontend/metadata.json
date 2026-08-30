@@ -1,0 +1,6 @@
+{
+  "name": "CareerBuddies",
+  "description": "Navigate your professional journey with confidence. CareerBuddies pairs you with industry mentors for structured, actionable career growth.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
