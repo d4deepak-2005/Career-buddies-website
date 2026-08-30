@@ -1,0 +1,170 @@
+<svg viewBox="0 0 800 960" width="800" height="960" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <radialGradient id="bg-glow-deepak" cx="50%" cy="35%" r="65%">
+      <stop offset="0%" stopColor="#f8f9fa" />
+      <stop offset="45%" stopColor="#e9ecef" />
+      <stop offset="85%" stopColor="#ced4da" />
+      <stop offset="100%" stopColor="#adb5bd" />
+    </radialGradient>
+    <linearGradient id="suit-black" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stopColor="#1e293b" />
+      <stop offset="50%" stopColor="#0f172a" />
+      <stop offset="100%" stopColor="#020617" />
+    </linearGradient>
+    <linearGradient id="red-tie" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stopColor="#dc2626" />
+      <stop offset="50%" stopColor="#b91c1c" />
+      <stop offset="100%" stopColor="#991b1b" />
+    </linearGradient>
+    <linearGradient id="skin-deepak" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stopColor="#f5cbb0" />
+      <stop offset="35%" stopColor="#e7ad85" />
+      <stop offset="80%" stopColor="#cd8d63" />
+      <stop offset="100%" stopColor="#b5744c" />
+    </linearGradient>
+    <linearGradient id="desk-wood-deepak" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stopColor="#452718" />
+      <stop offset="10%" stopColor="#321b10" />
+      <stop offset="100%" stopColor="#180c07" />
+    </linearGradient>
+    <linearGradient id="laptop-metal-deepak" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stopColor="#cbd5e1" />
+      <stop offset="50%" stopColor="#94a3b8" />
+      <stop offset="100%" stopColor="#64748b" />
+    </linearGradient>
+    <filter id="soft-shadow-deepak" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="8" stdDeviation="12" floodOpacity="0.3" />
+    </filter>
+  </defs>
+
+  <!-- Office Background -->
+  <rect width="800" height="960" fill="url(#bg-glow-deepak)" />
+
+  <!-- Left: Modern Office Shelving -->
+  <g transform="translate(20, 60)" opacity="0.9">
+    <rect x="0" y="0" width="150" height="700" fill="#1e293b" rx="6" />
+    <rect x="0" y="160" width="150" height="8" fill="#334155" />
+    <rect x="0" y="340" width="150" height="8" fill="#334155" />
+    <rect x="0" y="520" width="150" height="8" fill="#334155" />
+    <!-- Books -->
+    <rect x="15" y="40" width="22" height="120" fill="#0369a1" rx="3" />
+    <rect x="40" y="30" width="18" height="130" fill="#047857" rx="3" />
+    <rect x="62" y="55" width="25" height="105" fill="#b91c1c" rx="3" />
+    <rect x="90" y="35" width="20" height="125" fill="#4338ca" rx="3" />
+    <!-- Trophy / Award on Shelf 2 -->
+    <rect x="25" y="210" width="100" height="110" fill="#f8fafc" stroke="#d97706" stroke-width="5" rx="4" />
+    <circle cx="75" cy="255" r="14" fill="#d97706" opacity="0.3" />
+    <rect x="40" y="285" width="70" height="5" fill="#64748b" rx="2" />
+    <!-- Desk Plant on Shelf 3 -->
+    <rect x="45" y="465" width="55" height="55" fill="#ffffff" rx="6" />
+    <ellipse cx="72" cy="435" rx="32" ry="28" fill="#15803d" />
+  </g>
+
+  <!-- Right: Indoor Lush Foliage -->
+  <g transform="translate(640, 220)">
+    <path d="M50,380 Q100,280 120,180 Q80,220 50,380 Z" fill="#166534" />
+    <path d="M50,380 Q120,240 125,100 Q85,160 50,380 Z" fill="#15803d" />
+    <path d="M50,380 Q60,180 40,60 Q25,160 50,380 Z" fill="#22c55e" />
+    <path d="M50,380 Q10,210 -10,120 Q5,220 50,380 Z" fill="#16a34a" />
+  </g>
+
+  <!-- Wall CareerBuddies Signage -->
+  <g transform="translate(230, 85)" filter="url(#soft-shadow-deepak)">
+    <!-- Logo Symbol -->
+    <g transform="translate(50, 0) scale(1.1)">
+      <path d="M45,28 L35,42 L42,42 L38,55 L58,36 L48,36 Z" fill="#006e29" />
+      <circle cx="38" cy="22" r="5.5" fill="#002869" />
+      <circle cx="55" cy="14" r="5.5" fill="#006e29" />
+    </g>
+    <text x="125" y="42" font-family="'Plus Jakarta Sans', system-ui, sans-serif" font-weight="900" font-size="34" fill="#002869">Career</text>
+    <text x="240" y="42" font-family="'Plus Jakarta Sans', system-ui, sans-serif" font-weight="900" font-size="34" fill="#006e29">Buddies</text>
+    <text x="65" y="68" font-family="system-ui, sans-serif" font-weight="800" font-size="13" fill="#002869" letter-spacing="2.5">YOUR CAREER  |  🤝  |  OUR GUIDANCE</text>
+    <!-- CO-FOUNDER Badge -->
+    <rect x="80" y="80" width="220" height="34" rx="8" fill="#002869" />
+    <text x="190" y="103" font-family="'Plus Jakarta Sans', system-ui, sans-serif" font-weight="900" font-size="18" fill="#ffffff" text-anchor="middle" letter-spacing="3.5">CO-FOUNDER</text>
+  </g>
+
+  <!-- Person: Deepak Sah (Co-Founder) -->
+  <g id="person-deepak" filter="url(#soft-shadow-deepak)">
+    <!-- Body / Suit Shoulders -->
+    <path d="M165,960 L210,575 Q285,525 400,525 Q515,525 590,575 L635,960 Z" fill="url(#suit-black)" />
+
+    <!-- White Dress Shirt -->
+    <path d="M335,540 L400,760 L465,540 Q400,560 335,540 Z" fill="#ffffff" stroke="#e2e8f0" />
+    <path d="M335,540 L375,625 L400,570 L365,520 Z" fill="#ffffff" stroke="#cbd5e1" stroke-width="1.5" />
+    <path d="M465,540 L425,625 L400,570 L435,520 Z" fill="#ffffff" stroke="#cbd5e1" stroke-width="1.5" />
+
+    <!-- Vibrant Red Tie -->
+    <polygon points="388,565 412,565 418,600 382,600" fill="url(#red-tie)" />
+    <polygon points="384,600 416,600 422,780 400,815 378,780" fill="url(#red-tie)" />
+    <!-- Tie Shadow / Depth -->
+    <polygon points="400,600 416,600 422,780 400,815" fill="#991b1b" opacity="0.4" />
+
+    <!-- Suit Lapels -->
+    <path d="M260,560 L365,800 L395,800 L305,550 Z" fill="#1e293b" />
+    <path d="M540,560 L435,800 L405,800 L495,550 Z" fill="#1e293b" />
+
+    <!-- Neck -->
+    <rect x="365" y="440" width="70" height="105" rx="16" fill="url(#skin-deepak)" />
+    <path d="M365,485 Q400,525 435,485 L435,525 L365,525 Z" fill="#9b5832" opacity="0.3" />
+
+    <!-- Head / Face -->
+    <ellipse cx="400" cy="355" rx="88" ry="104" fill="url(#skin-deepak)" />
+    <!-- Cheeks -->
+    <ellipse cx="370" cy="350" rx="32" ry="38" fill="#fde0c2" opacity="0.35" />
+    <ellipse cx="430" cy="350" rx="32" ry="38" fill="#fde0c2" opacity="0.35" />
+
+    <!-- Sharp Clean Jaw & Subtle Stubble -->
+    <path d="M320,360 Q320,460 400,468 Q480,460 480,360 Q465,438 400,444 Q335,438 320,360 Z" fill="#2d1b11" opacity="0.25" />
+
+    <!-- Mouth / Confident Smile -->
+    <path d="M372,408 Q400,424 428,408" stroke="#ffffff" stroke-width="4.5" stroke-linecap="round" fill="none" />
+
+    <!-- Nose -->
+    <path d="M397,338 L392,374 L410,374" stroke="#8c4f2b" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round" fill="none" />
+
+    <!-- Eyes & Brows -->
+    <!-- Left -->
+    <path d="M344,306 Q368,296 388,308" stroke="#090d16" stroke-width="6" stroke-linecap="round" fill="none" />
+    <ellipse cx="366" cy="326" rx="9.5" ry="7.5" fill="#1e293b" />
+    <circle cx="369" cy="324" r="3" fill="#ffffff" />
+    <!-- Right -->
+    <path d="M412,308 Q432,296 456,306" stroke="#090d16" stroke-width="6" stroke-linecap="round" fill="none" />
+    <ellipse cx="434" cy="326" rx="9.5" ry="7.5" fill="#1e293b" />
+    <circle cx="437" cy="324" r="3" fill="#ffffff" />
+
+    <!-- Sleek Executive Hair (Side-parted) -->
+    <path d="M312,330 Q305,240 370,225 Q420,218 465,232 Q495,250 488,330 Q475,258 400,255 Q325,258 312,330 Z" fill="#090d16" />
+    <path d="M350,232 Q395,212 445,225 Q415,214 375,222 Z" fill="#1e293b" />
+
+    <!-- Clasped Hands -->
+    <g transform="translate(400, 825)">
+      <ellipse cx="0" cy="0" rx="75" ry="38" fill="url(#skin-deepak)" />
+      <path d="M-50,0 Q0,20 50,0" stroke="#8c4f2b" stroke-width="3" fill="none" />
+      <path d="M-30,-8 Q0,10 30,-8" stroke="#8c4f2b" stroke-width="3" fill="none" />
+    </g>
+  </g>
+
+  <!-- Executive Desk -->
+  <rect x="0" y="805" width="800" height="155" fill="url(#desk-wood-deepak)" />
+  <rect x="0" y="805" width="800" height="8" fill="#5a331f" />
+
+  <!-- Left: Open Laptop -->
+  <g transform="translate(60, 695)" opacity="0.95">
+    <polygon points="15,0 175,0 165,120 5,120" fill="url(#laptop-metal-deepak)" stroke="#475569" stroke-width="2" />
+    <rect x="20" y="10" width="140" height="98" fill="#0f172a" rx="2" />
+    <circle cx="90" cy="55" r="9" fill="#ffffff" opacity="0.8" />
+    <polygon points="-5,120 180,120 210,150 -20,150" fill="#64748b" />
+  </g>
+
+  <!-- Right: Executive Notebook & Pen -->
+  <g transform="translate(600, 770)">
+    <rect x="0" y="0" width="130" height="65" rx="5" fill="#1e293b" />
+    <rect x="8" y="6" width="114" height="53" rx="3" fill="#f8fafc" />
+    <line x1="20" y1="18" x2="105" y2="18" stroke="#cbd5e1" stroke-width="2" />
+    <line x1="20" y1="30" x2="100" y2="30" stroke="#cbd5e1" stroke-width="2" />
+    <line x1="20" y1="42" x2="85" y2="42" stroke="#cbd5e1" stroke-width="2" />
+    <!-- Gold Pen -->
+    <polygon points="120,5 125,12 85,55 80,48" fill="#d97706" />
+  </g>
+</svg>
