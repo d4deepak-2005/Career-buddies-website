@@ -5,108 +5,96 @@ export const LEADERSHIP_PROFILES: (FounderInfo & { id: string; experienceYears: 
     id: "nishant-sharma",
     name: "Nishant Sharma",
     role: "Founder",
-    title: "Founder & Strategic Mentor, CareerBuddies",
+    title: "Founder, CareerBuddies",
     email: "nishant.sharma@careerbuddies.in",
     avatar: "/assets/nishant.png",
-    experienceYears: 12,
-    bio: "Passionate about democratizing access to high-caliber executive and technical mentorship. Driving the vision of structured career transformation for professionals worldwide.",
-    contribution: "Pioneered the core career acceleration architecture, career diagnostic methodology, and leadership standards at CareerBuddies.",
+    experienceYears: 10,
+    bio: "Nishant Sharma is the Founder of CareerBuddies and brings over 10 years of professional experience to the platform. His focus is on building a meaningful career guidance ecosystem that helps working professionals navigate important career decisions with greater clarity and confidence.",
+    contribution: "As Founder, Nishant leads the overall vision and direction of CareerBuddies, with the goal of building a platform that makes quality career guidance more accessible, relevant and practical for ambitious professionals.",
     expertise: [
-      "Executive Career Strategy",
-      "Career Roadmapping & Leveling",
-      "Staff+ / Principal Engineering Bar",
-      "Salary & Offer Negotiation Strategy",
-      "High-Performance Team Leadership"
+      "Career Guidance",
+      "Professional Development",
+      "Career Transitions",
+      "Role Progression",
+      "Leadership Growth"
     ],
     careerHighlights: [
-      "12+ years leading technology initiatives and engineering organizations.",
-      "Directly mentored 400+ professionals across Tier-1 tech ecosystems.",
-      "Architected proprietary 5-pillar career diagnostic assessment used across CareerBuddies.",
-      "Keynote speaker and mentor across national technology and leadership summits."
+      "Over 10 years of professional experience.",
+      "Focused on building a meaningful career guidance ecosystem for working professionals.",
+      "Connecting career aspirations with practical guidance, industry perspectives and structured learning opportunities.",
+      "Leading the overall vision and direction of CareerBuddies."
     ],
     areasOfGuidance: [
-      "Engineering Leadership & Staff+ Promotions",
-      "Navigating Senior Executive Transitions",
-      "Executive Presence & Stakeholder Management",
-      "Compensation Benchmark Strategy & Negotiation"
+      "Career Transitions",
+      "Role Progression",
+      "Leadership Growth",
+      "Long-term Professional Development"
     ],
-    previousRoles: [
-      "VP / Director of Engineering at Hyper-growth Tech Ecosystems",
-      "Senior Technical Program Leader",
-      "Principal Systems Architect"
-    ],
+    previousRoles: [],
     linkedIn: "https://www.linkedin.com/company/careerbuddies"
   },
   {
     id: "deepak-sah",
     name: "Deepak Sah",
     role: "Co-Founder",
-    title: "Co-Founder & Product Head, CareerBuddies",
+    title: "Co-Founder, CareerBuddies",
     email: "deepak.sah@careerbuddies.in",
     avatar: "/assets/deepak.png",
-    experienceYears: 10,
-    bio: "Product strategist and technologist focused on crafting human-centric mentorship matching engines, career diagnostic rubrics, and personalized growth roadmaps.",
-    contribution: "Architected the mentor-mentee matching rubric, learning experience design, and structured diagnostic framework.",
+    experienceYears: 8,
+    bio: "Deepak Sah is the Co-Founder of CareerBuddies and brings over 8 years of professional experience. He is focused on understanding the evolving needs of working professionals and contributing towards a more structured and accessible approach to career development.",
+    contribution: "As Co-Founder, Deepak works towards strengthening the CareerBuddies vision of creating a supportive platform where professionals can learn, gain perspective and move forward in their careers with greater clarity.",
     expertise: [
-      "Product Strategy & 0-to-1 Roadmaps",
-      "Diagnostic Assessment Engines",
-      "Career Pivot Frameworks",
-      "User Experience & Product Sense",
-      "Growth Architecture"
+      "Career Development",
+      "Professional Guidance",
+      "Career Growth",
+      "Informed Career Choices",
+      "Structured Learning"
     ],
     careerHighlights: [
-      "10+ years driving product innovation, consumer platforms, and scaled systems.",
-      "Guided 250+ aspiring and mid-career professionals into high-impact Product Management roles.",
-      "Designed the 4-phase Career Journey Navigator and personalized mentorship matching rubric.",
-      "Product advisor to multiple tech startups across India and Southeast Asia."
+      "Over 8 years of professional experience.",
+      "Focused on understanding the evolving needs of working professionals.",
+      "Contributing towards a more structured and accessible approach to career development.",
+      "Shaping experiences and initiatives that help professionals make more informed career choices."
     ],
     areasOfGuidance: [
-      "Transitioning from Engineering / Analytics to Product Management",
-      "Mastering PM Case Interviews & Product Teardowns",
-      "Metrics-Driven Product Strategy & Roadmapping",
-      "Portfolio & PRD Review for PM Aspirants"
+      "Career Growth",
+      "Exploring New Opportunities",
+      "Making Important Professional Decisions",
+      "Accessing Relevant Guidance"
     ],
-    previousRoles: [
-      "Lead Product Manager at Consumer Tech Scale-ups",
-      "Senior Product Strategist",
-      "Technology & UX Consultant"
-    ],
+    previousRoles: [],
     linkedIn: "https://www.linkedin.com/company/careerbuddies"
   },
   {
     id: "divyanshu-gautam",
     name: "Divyanshu Gautam",
     role: "Co-Founder",
-    title: "Co-Founder & Growth Head, CareerBuddies",
+    title: "Co-Founder, CareerBuddies",
     email: "divyanshu.gautam@careerbuddies.in",
     avatar: "/assets/divyanshu.png",
-    experienceYears: 9,
-    bio: "Building enterprise partner ecosystems, mentor vetting standards, and community initiatives connecting ambitious learners with industry-leading practitioners.",
-    contribution: "Spearheaded mentor onboarding, practitioner vetting, live masterclass series, and community outreach.",
+    experienceYears: 6,
+    bio: "Divyanshu Gautam is the Co-Founder of CareerBuddies and brings over 6 years of professional experience. His focus is on contributing to initiatives that make career guidance and professional development more practical, approachable and relevant for working professionals.",
+    contribution: "As Co-Founder, Divyanshu supports the development and growth of the CareerBuddies ecosystem, with a focus on creating meaningful value for professionals across different stages of their careers.",
     expertise: [
-      "Mentor Ecosystem Architecture",
-      "Practitioner Vetting & Quality Standards",
-      "Live Masterclass Series & Webinars",
-      "Community Growth & Engagement",
-      "Industry Partnerships"
+      "Career Guidance",
+      "Professional Development",
+      "Career Growth",
+      "Career Options",
+      "Ecosystem Development"
     ],
     careerHighlights: [
-      "9+ years scaling operational platforms, talent networks, and community education.",
-      "Built a verified network of 150+ senior mentors from premier global tech companies.",
-      "Curated and launched 50+ live interactive masterclasses with 98% attendee satisfaction.",
-      "Pioneered the transparent ₹199 webinar initiative to make top-tier learning accessible."
+      "Over 6 years of professional experience.",
+      "Focused on making career guidance and professional development more practical, approachable and relevant.",
+      "Building experiences that help individuals better understand their career options.",
+      "Supporting the development and growth of the CareerBuddies ecosystem."
     ],
     areasOfGuidance: [
-      "Early Career Growth & Placement Strategy",
-      "Profile & Resume High-Signal Positioning",
-      "Overcoming Career Plateaus & Skill Gaps",
-      "Building Professional Capital & Networking"
+      "Understanding Career Options",
+      "Approaching Professional Growth with Confidence",
+      "Navigating Non-linear Career Journeys",
+      "Practical Career Guidance"
     ],
-    previousRoles: [
-      "Head of Community & Partnerships at Tech Education Ventures",
-      "Growth & Operations Lead",
-      "Talent Strategy Consultant"
-    ],
+    previousRoles: [],
     linkedIn: "https://www.linkedin.com/company/careerbuddies"
   }
 ];
