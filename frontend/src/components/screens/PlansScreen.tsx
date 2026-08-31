@@ -134,7 +134,7 @@ export const PlansScreen: React.FC<PlansScreenProps> = ({
                           <span>Custom Fee Structure</span>
                         </div>
                         <span className="text-xl sm:text-2xl font-black text-[#061b3b]">
-                          Tailored to Profile
+                          Personalised Investment
                         </span>
                         <p className="text-xs text-[#006e29] font-bold bg-[#79fd8d]/15 p-2.5 rounded-xl border border-[#006e29]/20 leading-relaxed">
                           {plan.customPricingNote || "Get a personalised plan and fee structure based on your career profile and requirements."}
@@ -184,7 +184,7 @@ export const PlansScreen: React.FC<PlansScreenProps> = ({
                         : 'bg-[#f1f3ff] hover:bg-[#dae2ff] text-[#002869] border border-[#cbdaff]'
                     }`}
                   >
-                    <span>{plan.isCustomPricing ? 'Connect with Our Sales Team' : `Choose ${plan.name}`}</span>
+                    <span>{plan.isCustomPricing ? 'Connect with an Advisor' : `Choose ${plan.name}`}</span>
                     <ArrowRight className="w-4 h-4" />
                   </button>
                 </div>

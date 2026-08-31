@@ -635,7 +635,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                     onClick={() => onSelectPlan(plan)}
                     className="px-4 py-2.5 rounded-xl bg-[#002869] hover:bg-[#0b3d91] text-white text-xs font-bold transition-all shadow-2xs flex items-center gap-1.5 cursor-pointer"
                   >
-                    <span>View Plan Details</span>
+                    <span>{plan.isCustomPricing ? 'Connect with an Advisor' : 'View Plan Details'}</span>
                     <ArrowRight className="w-3 h-3" />
                   </button>
                 </div>

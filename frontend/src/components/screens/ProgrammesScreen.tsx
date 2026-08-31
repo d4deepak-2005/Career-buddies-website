@@ -160,10 +160,10 @@ export const ProgrammesScreen: React.FC<ProgrammesScreenProps> = ({
                   </div>
 
                   <button
-                    onClick={() => onNavigate('webinars')}
+                    onClick={() => plan.isCustomPricing ? onOpenCounselling() : onNavigate('webinars')}
                     className="px-4 py-2.5 rounded-xl bg-[#006e29] hover:bg-[#00531d] text-white text-xs font-bold transition-all shadow-xs flex items-center gap-1.5 cursor-pointer"
                   >
-                    <span>Start with ₹199 Webinar</span>
+                    <span>{plan.isCustomPricing ? 'Connect with an Advisor' : 'Start with ₹199 Webinar'}</span>
                     <ArrowRight className="w-3 h-3" />
                   </button>
                 </div>
