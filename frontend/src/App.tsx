@@ -142,11 +142,7 @@ export default function App() {
   };
 
   const handleSelectPlan = (plan: PlanItem) => {
-    if (plan.isCustomPricing) {
-      handleOpenCounsellingWithPlan(`${plan.name} (Custom Profile Pricing)`);
-    } else {
-      handleOpenCounsellingWithPlan(`${plan.name} Plan (${plan.priceINR})`);
-    }
+    handleOpenCounsellingWithPlan(plan.name);
   };
 
   const handleSelectService = (service: ServiceItem) => {
@@ -206,6 +202,7 @@ export default function App() {
         {activePage === 'programmes' && (
           <ProgrammesScreen
             onNavigate={setActivePage}
+            onSelectPlan={handleSelectPlan}
             onOpenCounselling={() => handleOpenCounsellingWithPlan('Specialised Programme Cohort')}
           />
         )}

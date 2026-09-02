@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { CAREER_PLANS } from '../../data/mockData';
 import { PlanItem, PageView } from '../../types';
+import { ProgrammeDetailModal } from '../modals/ProgrammeDetailModal';
 import { 
   Check, 
   X, 
@@ -27,6 +28,7 @@ export const PlansScreen: React.FC<PlansScreenProps> = ({
   setActivePage
 }) => {
   const [currency, setCurrency] = useState<'INR' | 'USD'>('INR');
+  const [detailPlan, setDetailPlan] = useState<PlanItem | null>(null);
 
   return (
     <div className="w-full min-h-screen bg-[#f9f9ff] py-10 px-4 sm:px-6 lg:px-10">
@@ -101,18 +103,21 @@ export const PlansScreen: React.FC<PlansScreenProps> = ({
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-stretch">
           {CAREER_PLANS.map((plan) => {
             const isFeatured = plan.isRecommended;
+            const isElevate = plan.id === 'elevate';
             return (
               <div
                 key={plan.id}
-                className={`bg-white rounded-3xl p-8 flex flex-col justify-between transition-all duration-300 relative ${
+                className={`rounded-3xl p-8 flex flex-col justify-between transition-all duration-300 relative ${
                   isFeatured
-                    ? 'border-2 border-[#002869] shadow-xl ring-4 ring-[#002869]/5'
-                    : 'border border-[#cbdaff] hover:border-[#002869]/40 shadow-xs'
+                    ? 'border-2 border-[#002869] shadow-xl ring-4 ring-[#002869]/5 bg-white'
+                    : isElevate
+                    ? 'border-2 border-[#1f8a70]/50 shadow-lg bg-gradient-to-br from-[#eef7f3] to-[#e9f1fb]'
+                    : 'border border-[#cbdaff] hover:border-[#002869]/40 shadow-xs bg-white'
                 }`}
               >
                 {plan.badge && (
                   <span className="absolute -top-3.5 left-1/2 -translate-x-1/2 px-4 py-1 bg-[#006e29] text-white text-[11px] font-black uppercase tracking-wider rounded-full shadow-xs">
-                    {plan.badge}
+                    {isFeatured ? 'Recommended Track' : plan.badge}
                   </span>
                 )}
 

@@ -301,7 +301,7 @@ export const CAREER_PLANS: PlanItem[] = [
     period: "one-time",
     description: "Gain clarity, identify the right career direction, and build a personalised roadmap for your next step.",
     sessionsCount: "Career Assessment + Personalised Roadmap",
-    supportType: "Post-Programme Support – 15 Days",
+    supportType: "Post-Programme Support - 15 Days",
     bestFor: "Professionals seeking clarity and the right career direction.",
     badge: "Clarity",
     features: [
@@ -311,9 +311,9 @@ export const CAREER_PLANS: PlanItem[] = [
       { title: "Target Role Identification", included: true },
       { title: "Personalised Career Roadmap", included: true },
       { title: "Certification & Upskilling Recommendations", included: true },
-      { title: "Resume Optimisation – Basic Review", included: true },
-      { title: "LinkedIn Optimisation – Basic Recommendations", included: true },
-      { title: "Post-Programme Support – 15 Days", included: true }
+      { title: "Resume Optimisation - Basic Review", included: true },
+      { title: "LinkedIn Optimisation - Basic Recommendations", included: true },
+      { title: "Post-Programme Support - 15 Days", included: true }
     ]
   },
   {
@@ -323,12 +323,11 @@ export const CAREER_PLANS: PlanItem[] = [
     priceINR: "₹14,999",
     priceUSD: "$185",
     period: "one-time",
-    isRecommended: true,
     description: "Strengthen your profile, sharpen your job-search strategy, and prepare confidently for better opportunities.",
     sessionsCount: "Interview Preparation + Mock Interviews (2 Sessions)",
-    supportType: "Post-Programme Support – 45 Days • Monthly Progress Tracking",
+    supportType: "Post-Programme Support - 45 Days • Monthly Progress Tracking",
     bestFor: "Professionals preparing for better opportunities with a stronger job-search strategy.",
-    badge: "Most Popular",
+    badge: "Preparation & Growth",
     features: [
       { title: "Career Assessment", included: true },
       { title: "Industry & Role-Specific Career Guidance", included: true },
@@ -336,17 +335,17 @@ export const CAREER_PLANS: PlanItem[] = [
       { title: "Target Role Identification", included: true },
       { title: "Personalised Career Roadmap", included: true },
       { title: "Certification & Upskilling Recommendations", included: true },
-      { title: "Resume Optimisation – ATS-Optimised Resume", included: true },
-      { title: "LinkedIn Optimisation – Complete Profile Optimisation", included: true },
+      { title: "Resume Optimisation - ATS-Optimised Resume", included: true },
+      { title: "LinkedIn Optimisation - Complete Profile Optimisation", included: true },
       { title: "Target Company Identification", included: true },
       { title: "Job Search Strategy", included: true },
       { title: "Networking & Referral Strategy", included: true },
       { title: "HR Interview Preparation", included: true },
-      { title: "Role-Specific Interview Preparation – 1 Session", included: true },
-      { title: "Personalised Mock Interviews – 2 Sessions", included: true },
+      { title: "Role-Specific Interview Preparation - 1 Session", included: true },
+      { title: "Personalised Mock Interviews - 2 Sessions", included: true },
       { title: "Salary Negotiation Guidance", included: true },
-      { title: "Post-Programme Support – 45 Days", included: true },
-      { title: "Progress Tracking – Monthly", included: true }
+      { title: "Post-Programme Support - 45 Days", included: true },
+      { title: "Progress Tracking - Monthly", included: true }
     ]
   },
   {
@@ -356,32 +355,37 @@ export const CAREER_PLANS: PlanItem[] = [
     priceINR: "Personalised Investment",
     priceUSD: "Personalised Investment",
     period: "",
+    isRecommended: true,
     isCustomPricing: true,
     customPricingNote: "Connect with our Career Advisor to understand the programme investment based on your profile and requirements.",
     description: "Comprehensive career support with personalised preparation, deeper guidance and exclusive industry mentor access.",
     sessionsCount: "Comprehensive, Personalised Career Support",
-    supportType: "Exclusive Industry Mentor Access",
+    supportType: "Post-Programme Support - 90 Days • Exclusive Industry Mentor Access",
     bestFor: "Professionals seeking complete, personalised career support.",
     badge: "Complete Career Support",
     features: [
       { title: "Career Assessment", included: true },
       { title: "Industry & Role-Specific Career Guidance", included: true },
-      { title: "Exclusive Career Guidance Session for EXCEL Programme Participants", included: true },
       { title: "Career & Skill Gap Analysis", included: true },
       { title: "Target Role Identification", included: true },
       { title: "Personalised Career Roadmap", included: true },
       { title: "Certification & Upskilling Recommendations", included: true },
-      { title: "Resume Optimisation – ATS-Optimised with Multiple Iterations", included: true },
-      { title: "LinkedIn Optimisation – Complete with Personal Branding", included: true },
-      { title: "Target Company Identification – Customised List", included: true },
+      { title: "Resume Optimisation - ATS-Optimised with Multiple Iterations", included: true },
+      { title: "LinkedIn Optimisation - Complete with Personal Branding", included: true },
+      { title: "Target Company Identification - Customised List", included: true },
       { title: "Job Search Strategy", included: true },
-      { title: "Networking & Referral Strategy – Personalised", included: true },
-      { title: "HR Interview Preparation – Extensive", included: true },
-      { title: "Role-Specific Interview Preparation – Multiple Sessions", included: true }
+      { title: "Networking & Referral Strategy - Personalised", included: true },
+      { title: "HR Interview Preparation - Extensive", included: true },
+      { title: "Role-Specific Interview Preparation - Multiple Sessions", included: true },
+      { title: "Personalised Mock Interviews - Multiple Sessions", included: true },
+      { title: "Salary Negotiation Guidance", included: true },
+      { title: "Exclusive Industry Mentor Access", included: true },
+      { title: "Comprehensive Personalised Career Support", included: true },
+      { title: "Post-Programme Support - 90 Days", included: true },
+      { title: "Progress Tracking", included: true }
     ]
   }
 ];
-
 export const RESOURCE_CATEGORIES: ResourceCategory[] = [
   {
     id: "cat-resume",
