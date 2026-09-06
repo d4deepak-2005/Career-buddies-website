@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { MOCK_MENTORS, STRUCTURED_SERVICES, CAREER_PLANS, MOCK_FAQS } from '../../data/mockData';
-import { DEFAULT_SITE_CONFIG, INITIAL_WEBINARS, JOURNEY_TIMELINE } from '../../config/siteConfig';
+import { STRUCTURED_SERVICES, CAREER_PLANS, MOCK_FAQS } from '../../data/mockData';
+import { DEFAULT_SITE_CONFIG, JOURNEY_TIMELINE } from '../../config/siteConfig';
 import { Mentor, PageView, ServiceItem, PlanItem } from '../../types';
 import { BrandTagline } from '../BrandTagline';
 import { FindYourNextStep } from '../common/FindYourNextStep';
@@ -14,9 +14,8 @@ import {
   Star, 
   ArrowRight, 
   Sparkles, 
-  Briefcase, 
-  Clock, 
-  Users, 
+  Briefcase,
+  Users,
   Calendar,
   Compass,
   GraduationCap,
@@ -57,9 +56,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   setActivePage,
   onSelectLeader
 }) => {
-  const featuredMentors = MOCK_MENTORS.slice(0, 3);
   const previewServices = STRUCTURED_SERVICES.slice(0, 6);
-  const upcomingWebinars = INITIAL_WEBINARS.slice(0, 2);
 
   // Quick Hero Lead Capture Form state
   const [heroForm, setHeroForm] = useState({
@@ -673,77 +670,6 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
             </button>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 sm:gap-8">
-            {upcomingWebinars.map((webinar) => (
-              <div
-                key={webinar.id}
-                className="bg-white rounded-3xl border border-[#cbdaff] hover:border-[#002869]/50 p-6 sm:p-7 flex flex-col justify-between transition-all duration-200 hover:shadow-md group"
-              >
-                <div>
-                  <div className="flex items-center justify-between gap-2 mb-3">
-                    <span className="px-3 py-0.5 rounded-full bg-[#dae2ff] text-[#001947] text-[11px] font-bold">
-                      {webinar.category}
-                    </span>
-                    <span className="px-2.5 py-0.5 rounded-full bg-[#79fd8d]/25 text-[#00531d] text-[11px] font-bold">
-                      {webinar.badge}
-                    </span>
-                  </div>
-
-                  <h3 
-                    onClick={() => setActivePage('webinars')}
-                    className="text-lg font-bold text-[#061b3b] group-hover:text-[#002869] transition-colors mb-2 cursor-pointer font-['Plus_Jakarta_Sans',sans-serif]"
-                  >
-                    {webinar.title}
-                  </h3>
-
-                  <p className="text-xs text-[#434652] leading-relaxed mb-4 line-clamp-2">
-                    {webinar.tagline}
-                  </p>
-
-                  <div className="flex items-center gap-3 p-3.5 rounded-xl bg-[#f9f9ff] border border-[#e0e8ff] mb-4">
-                    <img
-                      src={webinar.speaker.avatar}
-                      alt={webinar.speaker.name}
-                      className="w-11 h-11 rounded-xl object-cover shadow-2xs"
-                    />
-                    <div className="flex flex-col">
-                      <span className="text-xs font-bold text-[#061b3b]">{webinar.speaker.name}</span>
-                      <span className="text-[11px] text-[#006e29] font-medium">{webinar.speaker.role} • {webinar.speaker.company}</span>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-4 text-xs text-[#747783] mb-4">
-                    <span className="flex items-center gap-1.5">
-                      <Calendar className="w-3.5 h-3.5 text-[#002869]" />
-                      {webinar.date}
-                    </span>
-                    <span className="flex items-center gap-1.5">
-                      <Clock className="w-3.5 h-3.5 text-[#006e29]" />
-                      {webinar.time}
-                    </span>
-                  </div>
-                </div>
-
-                <div className="pt-4 border-t border-gray-200 flex items-center justify-between">
-                  <div className="flex items-baseline gap-1.5">
-                    <span className="text-lg font-extrabold text-[#006e29]">
-                      ₹{webinar.priceINR}
-                    </span>
-                    <span className="text-[11px] text-[#747783]">/ Pass</span>
-                  </div>
-
-                  <button
-                    onClick={() => setActivePage('webinars')}
-                    className="px-4 py-2 rounded-xl bg-[#002869] text-white text-xs font-bold hover:bg-[#0b3d91] transition-all flex items-center gap-1.5 cursor-pointer"
-                  >
-                    <span>Register Now</span>
-                    <ArrowRight className="w-3 h-3" />
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
-
         </div>
       </section>
 
@@ -866,64 +792,6 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
               <span>Explore All Mentors</span>
               <ArrowRight className="w-3.5 h-3.5" />
             </button>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8 items-stretch">
-            {featuredMentors.map((mentor) => (
-              <div
-                key={mentor.id}
-                className="bg-gradient-to-b from-[#002869] to-[#001f52] rounded-3xl border border-[#1b3d7a] hover:border-[#79fd8d]/50 p-6 sm:p-7 flex flex-col justify-between transition-all duration-200 shadow-md hover:shadow-xl group"
-              >
-                <div>
-                  <div className="flex items-center gap-4 mb-4">
-                    <img
-                      src={mentor.avatar}
-                      alt={mentor.name}
-                      className="w-16 h-16 rounded-2xl object-cover border border-white/20 shadow-xs shrink-0"
-                    />
-                    <div className="flex flex-col min-w-0">
-                      <h4 
-                        onClick={() => onSelectMentor(mentor)}
-                        className="font-bold text-base text-white group-hover:text-[#79fd8d] transition-colors cursor-pointer truncate font-['Plus_Jakarta_Sans',sans-serif]"
-                      >
-                        {mentor.name}
-                      </h4>
-                      <span className="text-xs font-semibold text-[#79fd8d] truncate">{mentor.title}</span>
-                      <span className="text-[11px] text-[#dae2ff]/80 truncate font-medium">{mentor.company}</span>
-                    </div>
-                  </div>
-
-                  <p className="text-xs text-[#dae2ff]/90 leading-relaxed line-clamp-3 mb-4">
-                    {mentor.bio}
-                  </p>
-
-                  <div className="flex flex-wrap gap-1.5 mb-5">
-                    {mentor.skills.slice(0, 3).map((sk, idx) => (
-                      <span
-                        key={idx}
-                        className="px-2.5 py-0.5 rounded-md bg-white/10 text-[#dae2ff] text-[10px] font-semibold border border-white/15"
-                      >
-                        {sk}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="pt-4 border-t border-white/15 flex items-center justify-between gap-3">
-                  <div className="flex items-baseline gap-1">
-                    <span className="text-base font-extrabold text-white">${mentor.hourlyRate}</span>
-                    <span className="text-[10px] text-[#dae2ff]/70 font-medium">/ session</span>
-                  </div>
-
-                  <button
-                    onClick={() => onBookMentor(mentor)}
-                    className="px-4 py-2 bg-white hover:bg-[#eef3fc] text-[#002869] text-xs font-bold rounded-xl transition-all shadow-2xs hover:shadow-xs cursor-pointer shrink-0"
-                  >
-                    Book Master Session
-                  </button>
-                </div>
-              </div>
-            ))}
           </div>
 
         </div>
