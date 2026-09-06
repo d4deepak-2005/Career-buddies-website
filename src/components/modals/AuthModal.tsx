@@ -32,14 +32,24 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
   if (!isOpen) return null;
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-    setTimeout(() => {
+    const resolvedEmail = email || 'user@careerbuddies.in';
+
+    try {
+      await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: resolvedEmail, name: name || undefined })
+      });
+    } catch (err) {
+      console.warn('Login activity logging failed (continuing anyway):', err);
+    } finally {
       setLoading(false);
-      onSuccess(email || 'user@careerbuddies.in');
+      onSuccess(resolvedEmail);
       onClose();
-    }, 600);
+    }
   };
 
   const handleForgotPassword = () => {

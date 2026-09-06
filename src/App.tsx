@@ -11,6 +11,7 @@ import {
 } from './types';
 import { Navbar } from './components/Navbar';
 import { Footer } from './components/Footer';
+import { CheckCircle2, XCircle, X as CloseIcon } from 'lucide-react';
 
 // Screens
 import { HomeScreen } from './components/screens/HomeScreen';
@@ -57,6 +58,8 @@ export default function App() {
   const [isUserDashboardOpen, setIsUserDashboardOpen] = useState(false);
   const [isCounsellingOpen, setIsCounsellingOpen] = useState(false);
   const [counsellingPlanInterest, setCounsellingPlanInterest] = useState<string>('Free 1:1 Strategic Diagnostic');
+  const [checkoutPlanId, setCheckoutPlanId] = useState<'explore' | 'elevate' | null>(null);
+  const [paymentReturnStatus, setPaymentReturnStatus] = useState<'success' | 'cancelled' | null>(null);
 
   // Webinar Modal State
   const [selectedWebinarForDetail, setSelectedWebinarForDetail] = useState<WebinarItem | null>(null);
@@ -98,6 +101,19 @@ export default function App() {
 
   // Current Logged-in Candidate Email
   const [currentUserEmail, setCurrentUserEmail] = useState<string>('rahul.sharma@techcorp.com');
+
+  // Detect return from the Dodo Payments checkout (return_url / cancel_url)
+  React.useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const payment = params.get('payment');
+    if (payment === 'success' || payment === 'cancelled') {
+      setPaymentReturnStatus(payment);
+      params.delete('payment');
+      params.delete('plan');
+      const cleanUrl = window.location.pathname + (params.toString() ? `?${params.toString()}` : '');
+      window.history.replaceState({}, '', cleanUrl);
+    }
+  }, []);
 
   // Handlers
   const handleSelectLeader = (slug: string) => {
@@ -143,8 +159,13 @@ export default function App() {
 
   const handleSelectPlan = (plan: PlanItem) => {
     if (plan.isCustomPricing) {
+      setCheckoutPlanId(null);
       handleOpenCounsellingWithPlan(`${plan.name} (Custom Profile Pricing)`);
+    } else if (plan.id === 'explore' || plan.id === 'elevate') {
+      setCheckoutPlanId(plan.id);
+      handleOpenCounsellingWithPlan(`${plan.name} (${plan.priceINR})`);
     } else {
+      setCheckoutPlanId(null);
       handleOpenCounsellingWithPlan(`${plan.name} Plan (${plan.priceINR})`);
     }
   };
@@ -363,11 +384,15 @@ export default function App() {
         onOpenCounselling={() => handleOpenCounsellingWithPlan()}
       />
 
-      {/* Free 1:1 Career Counselling Lead Capture Modal */}
+      {/* Free 1:1 Career Counselling Lead Capture Modal (also handles Explore/Elevate paid checkout redirect) */}
       <CounsellingModal
         isOpen={isCounsellingOpen}
-        onClose={() => setIsCounsellingOpen(false)}
+        onClose={() => {
+          setIsCounsellingOpen(false);
+          setCheckoutPlanId(null);
+        }}
         initialPlan={counsellingPlanInterest}
+        checkoutPlanId={checkoutPlanId}
         onSuccess={() => {
           setLeadCounter(prev => prev + 1);
         }}
@@ -472,6 +497,50 @@ export default function App() {
           setIsSmartMatchingOpen(true);
         }}
       />
+
+      {/* Payment Return Confirmation (Dodo Payments checkout redirect) */}
+      {paymentReturnStatus && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-200">
+          <div className="bg-white rounded-3xl max-w-md w-full p-8 shadow-2xl border border-[#cbdaff] flex flex-col items-center text-center gap-4 relative">
+            <button
+              onClick={() => setPaymentReturnStatus(null)}
+              className="absolute top-4 right-4 p-1.5 rounded-full text-[#747783] hover:bg-[#f1f3ff] cursor-pointer"
+              aria-label="Close"
+            >
+              <CloseIcon className="w-4 h-4" />
+            </button>
+
+            {paymentReturnStatus === 'success' ? (
+              <>
+                <div className="w-16 h-16 rounded-full bg-[#79fd8d]/20 text-[#006e29] flex items-center justify-center">
+                  <CheckCircle2 className="w-10 h-10" />
+                </div>
+                <h3 className="text-xl font-bold text-[#061b3b]">Payment Successful!</h3>
+                <p className="text-sm text-[#434652] leading-relaxed">
+                  Congratulations, your enrollment is confirmed. A confirmation email is on its way — our team will reach out shortly with your onboarding details.
+                </p>
+              </>
+            ) : (
+              <>
+                <div className="w-16 h-16 rounded-full bg-red-100 text-red-600 flex items-center justify-center">
+                  <XCircle className="w-10 h-10" />
+                </div>
+                <h3 className="text-xl font-bold text-[#061b3b]">Payment Not Completed</h3>
+                <p className="text-sm text-[#434652] leading-relaxed">
+                  Your payment was cancelled or didn't go through. No amount has been charged. You can try again anytime from the Plans page.
+                </p>
+              </>
+            )}
+
+            <button
+              onClick={() => setPaymentReturnStatus(null)}
+              className="mt-2 px-6 py-2.5 bg-[#002869] text-white font-semibold text-xs rounded-xl hover:bg-[#0b3d91] transition-colors cursor-pointer"
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      )}
 
     </div>
   );

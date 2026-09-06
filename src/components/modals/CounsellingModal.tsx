@@ -8,6 +8,8 @@ interface CounsellingModalProps {
   onClose: () => void;
   initialPlan?: string;
   initialService?: string;
+  /** When set to 'explore' or 'elevate', a successful submission redirects straight to the fixed-price Dodo Payments checkout instead of showing the "thank you" screen. */
+  checkoutPlanId?: 'explore' | 'elevate' | null;
   onSuccess?: () => void;
   onLeadSubmitted?: () => void;
 }
@@ -17,17 +19,20 @@ export const CounsellingModal: React.FC<CounsellingModalProps> = ({
   onClose,
   initialPlan,
   initialService,
+  checkoutPlanId,
   onSuccess,
   onLeadSubmitted
 }) => {
   const [submittedName, setSubmittedName] = useState('');
   const [isSuccess, setIsSuccess] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [checkoutError, setCheckoutError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!isOpen) {
       setIsSuccess(false);
       setSubmittedName('');
+      setCheckoutError(null);
     }
   }, [isOpen]);
 
@@ -35,6 +40,9 @@ export const CounsellingModal: React.FC<CounsellingModalProps> = ({
 
   const handleFormSubmit = async (data: StandardCandidateFormData) => {
     setLoading(true);
+    setCheckoutError(null);
+    let leadId: string | undefined;
+
     try {
       const response = await fetch('/api/leads', {
         method: 'POST',
@@ -55,20 +63,49 @@ export const CounsellingModal: React.FC<CounsellingModalProps> = ({
           source: initialPlan ? 'Plan Enquiry' : 'Counselling Modal'
         })
       });
-
-      setSubmittedName(data.firstName);
-      setIsSuccess(true);
-      if (onSuccess) onSuccess();
-      if (onLeadSubmitted) onLeadSubmitted();
+      const leadResult = await response.json().catch(() => null);
+      leadId = leadResult?.lead?.id;
     } catch (err) {
       console.error('Lead submission error:', err);
-      setSubmittedName(data.firstName);
-      setIsSuccess(true);
-      if (onSuccess) onSuccess();
-      if (onLeadSubmitted) onLeadSubmitted();
-    } finally {
-      setLoading(false);
     }
+
+    // Explore / Elevate are fixed-price paid plans: send the candidate straight
+    // to the Dodo Payments checkout instead of the "we'll reach out" screen.
+    if (checkoutPlanId) {
+      try {
+        const checkoutRes = await fetch('/api/payments/checkout', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            planId: checkoutPlanId,
+            firstName: data.firstName,
+            lastName: data.lastName,
+            email: data.email,
+            mobile: data.mobile,
+            leadId
+          })
+        });
+        const checkoutData = await checkoutRes.json();
+        if (checkoutRes.ok && checkoutData.success && checkoutData.checkoutUrl) {
+          if (onSuccess) onSuccess();
+          if (onLeadSubmitted) onLeadSubmitted();
+          window.location.href = checkoutData.checkoutUrl;
+          return;
+        }
+        setCheckoutError(
+          checkoutData.error || "We couldn't open the payment page automatically. Our team will reach out to complete your enrollment."
+        );
+      } catch (err) {
+        console.error('Checkout redirect error:', err);
+        setCheckoutError("We couldn't open the payment page automatically. Our team will reach out to complete your enrollment.");
+      }
+    }
+
+    setSubmittedName(data.firstName);
+    setIsSuccess(true);
+    if (onSuccess) onSuccess();
+    if (onLeadSubmitted) onLeadSubmitted();
+    setLoading(false);
   };
 
   const handleResetAndClose = () => {
@@ -120,6 +157,12 @@ export const CounsellingModal: React.FC<CounsellingModalProps> = ({
               <p className="text-sm text-[#434652] max-w-md leading-relaxed">
                 We have received your details successfully. Our senior career team will review your profile and reach out on WhatsApp/Email within <strong>2 business hours</strong> to schedule your free 1:1 counselling session.
               </p>
+
+              {checkoutError && (
+                <div className="w-full p-3 bg-amber-50 border border-amber-200 text-amber-800 text-xs font-semibold rounded-xl text-left">
+                  {checkoutError}
+                </div>
+              )}
 
               <div className="bg-[#f1f3ff] p-4 rounded-2xl border border-[#cbdaff] w-full text-left mt-2">
                 <div className="flex items-center gap-2 text-xs font-bold text-[#002869] mb-1">

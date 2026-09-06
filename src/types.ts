@@ -162,6 +162,22 @@ export interface Lead {
   whatsAppNotified?: boolean;
 }
 
+export interface PaymentRecord {
+  id: string;
+  planId: 'explore' | 'elevate' | 'excel';
+  planName: string;
+  candidateEmail: string;
+  candidateName: string;
+  amountINR: number;
+  status: 'pending' | 'succeeded' | 'failed' | 'cancelled';
+  createdAt: string;
+  updatedAt: string;
+  leadId?: string;
+  dodoCheckoutSessionId?: string;
+  dodoPaymentId?: string;
+  createdBy?: string;
+}
+
 export interface BookedSession {
   id: string;
   mentorId: string;

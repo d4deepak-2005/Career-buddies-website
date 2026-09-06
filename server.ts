@@ -4,11 +4,62 @@ import path from 'path';
 import fs from 'fs';
 import { createServer as createViteServer } from 'vite';
 import dotenv from 'dotenv';
+import { PLAN_DETAILS, createFixedPlanCheckout, createCustomAmountCheckout, verifyDodoWebhook } from './server/dodo';
+import { sendLoginNotificationEmail, sendPaymentSuccessEmail } from './server/email';
+import {
+  upsertCandidate,
+  logCandidateActivity,
+  listCandidates,
+  createPaymentRecord,
+  findPaymentById,
+  updatePaymentById,
+  listPayments
+} from './server/store';
 
 dotenv.config();
 
 const app = express();
 const PORT = 3000;
+
+// The Dodo webhook route needs the exact raw request body to verify its
+// signature, so it must be registered (with express.raw, not express.json)
+// BEFORE the global JSON body parser below.
+app.post('/api/webhooks/dodo', express.raw({ type: '*/*' }), async (req: Request, res: Response) => {
+  try {
+    const rawBody = req.body.toString('utf-8');
+    const event = verifyDodoWebhook(rawBody, req.headers as Record<string, string>);
+
+    if (event.type === 'payment.succeeded') {
+      const payload: any = event.data;
+      const localPaymentId: string | undefined = payload?.metadata?.local_payment_id;
+      const paymentRecord = localPaymentId ? updatePaymentById(localPaymentId, {
+        status: 'succeeded',
+        dodoPaymentId: payload?.payment_id
+      }) : undefined;
+
+      const email: string | undefined = paymentRecord?.candidateEmail || payload?.customer?.email;
+      const name: string | undefined = paymentRecord?.candidateName || payload?.customer?.name;
+
+      if (email) {
+        const planName = paymentRecord?.planName || 'your CareerBuddies program';
+        const amountINR = paymentRecord?.amountINR ?? (payload?.total_amount ? payload.total_amount / 100 : 0);
+        logCandidateActivity(email, 'payment_succeeded', `Payment received for ${planName} (₹${amountINR}).`);
+        await sendPaymentSuccessEmail(email, name || 'there', planName, amountINR);
+      }
+    } else if (event.type === 'payment.failed' || event.type === 'payment.cancelled') {
+      const payload: any = event.data;
+      const localPaymentId: string | undefined = payload?.metadata?.local_payment_id;
+      if (localPaymentId) {
+        updatePaymentById(localPaymentId, { status: event.type === 'payment.failed' ? 'failed' : 'cancelled' });
+      }
+    }
+
+    res.status(200).json({ received: true });
+  } catch (err) {
+    console.error('[Dodo Webhook] Verification/handling failed:', err);
+    res.status(400).json({ received: false });
+  }
+});
 
 app.use(express.json());
 
@@ -397,6 +448,128 @@ app.post('/api/webinars/register', async (req: Request, res: Response) => {
       message: 'Webinar registration recorded successfully.'
     });
   }
+});
+
+// 7. Candidate Login (Portal sign-in). Logs the activity and emails the candidate.
+app.post('/api/auth/login', async (req: Request, res: Response) => {
+  try {
+    const { email, name } = req.body;
+    if (!email || typeof email !== 'string') {
+      res.status(400).json({ success: false, error: 'Email is required.' });
+      return;
+    }
+
+    const candidate = logCandidateActivity(email, 'login', 'Logged in to the candidate portal.');
+    if (name && typeof name === 'string') {
+      candidate.fullName = name.trim();
+    }
+
+    sendLoginNotificationEmail(candidate.email, candidate.fullName).catch((err) =>
+      console.log('Login email notice:', err)
+    );
+
+    res.json({ success: true, candidate });
+  } catch (error) {
+    console.error('Error logging in candidate:', error);
+    res.status(500).json({ success: false, error: 'Login failed. Please try again.' });
+  }
+});
+
+// 8. Fixed-price checkout for the Explore / Elevate plans -> redirects to Dodo Payments
+app.post('/api/payments/checkout', async (req: Request, res: Response) => {
+  try {
+    const { planId, firstName, lastName, email, mobile, leadId } = req.body;
+
+    if (planId !== 'explore' && planId !== 'elevate') {
+      res.status(400).json({ success: false, error: 'planId must be "explore" or "elevate".' });
+      return;
+    }
+    if (!email || !firstName) {
+      res.status(400).json({ success: false, error: 'firstName and email are required.' });
+      return;
+    }
+
+    const fullName = `${firstName} ${lastName || ''}`.trim();
+    const plan = PLAN_DETAILS[planId as 'explore' | 'elevate'];
+    upsertCandidate({ email, fullName, mobile });
+
+    const paymentRecord = createPaymentRecord({
+      planId,
+      planName: plan.name,
+      candidateEmail: String(email).trim().toLowerCase(),
+      candidateName: fullName,
+      amountINR: plan.priceINR,
+      leadId
+    });
+
+    const appUrl = process.env.APP_URL || `http://localhost:${PORT}`;
+    const session = await createFixedPlanCheckout({
+      planId,
+      customer: { email, name: fullName, phone: mobile },
+      metadata: { local_payment_id: paymentRecord.id, plan: planId },
+      returnUrl: `${appUrl}/?payment=success&plan=${planId}`,
+      cancelUrl: `${appUrl}/?payment=cancelled&plan=${planId}`
+    });
+
+    updatePaymentById(paymentRecord.id, { dodoCheckoutSessionId: session.session_id });
+
+    res.json({ success: true, checkoutUrl: session.checkout_url, paymentId: paymentRecord.id });
+  } catch (error: any) {
+    console.error('Error creating plan checkout:', error);
+    res.status(500).json({ success: false, error: error?.message || 'Could not start checkout.' });
+  }
+});
+
+// 9. Manual/custom-amount checkout for the Excel program (internal/admin use)
+app.post('/api/payments/checkout-custom', async (req: Request, res: Response) => {
+  try {
+    const { firstName, lastName, email, mobile, amountINR, leadId, createdBy } = req.body;
+
+    const amount = Number(amountINR);
+    if (!email || !firstName || !Number.isFinite(amount) || amount <= 0) {
+      res.status(400).json({ success: false, error: 'firstName, email, and a positive amountINR are required.' });
+      return;
+    }
+
+    const fullName = `${firstName} ${lastName || ''}`.trim();
+    upsertCandidate({ email, fullName, mobile });
+
+    const paymentRecord = createPaymentRecord({
+      planId: 'excel',
+      planName: 'Excel Program (Executive & Premium)',
+      candidateEmail: String(email).trim().toLowerCase(),
+      candidateName: fullName,
+      amountINR: amount,
+      leadId,
+      createdBy
+    });
+
+    const appUrl = process.env.APP_URL || `http://localhost:${PORT}`;
+    const session = await createCustomAmountCheckout({
+      amountINR: amount,
+      customer: { email, name: fullName, phone: mobile },
+      metadata: { local_payment_id: paymentRecord.id, plan: 'excel' },
+      returnUrl: `${appUrl}/?payment=success&plan=excel`,
+      cancelUrl: `${appUrl}/?payment=cancelled&plan=excel`
+    });
+
+    updatePaymentById(paymentRecord.id, { dodoCheckoutSessionId: session.session_id });
+
+    res.json({ success: true, checkoutUrl: session.checkout_url, paymentId: paymentRecord.id });
+  } catch (error: any) {
+    console.error('Error creating custom checkout:', error);
+    res.status(500).json({ success: false, error: error?.message || 'Could not start checkout.' });
+  }
+});
+
+// 10. List candidates (internal dashboard use, e.g. picking who to bill for Excel)
+app.get('/api/candidates', (req: Request, res: Response) => {
+  res.json({ success: true, candidates: listCandidates() });
+});
+
+// 11. List payments (internal dashboard use)
+app.get('/api/payments', (req: Request, res: Response) => {
+  res.json({ success: true, payments: listPayments() });
 });
 
 // Leadership image routes with automatic high-fidelity fallback

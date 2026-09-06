@@ -1,24 +1,29 @@
 import React, { useState, useEffect } from 'react';
-import { Lead, WebinarItem, WebinarRegistration, SiteConfig } from '../../types';
+import { Lead, WebinarItem, WebinarRegistration, SiteConfig, PaymentRecord } from '../../types';
 import { DEFAULT_SITE_CONFIG, INITIAL_WEBINARS } from '../../config/siteConfig';
-import { 
-  ShieldCheck, 
-  Users, 
-  GraduationCap, 
-  FileText, 
-  Settings, 
-  Download, 
-  Plus, 
-  Edit3, 
-  Trash2, 
-  CheckCircle2, 
-  Clock, 
-  PhoneCall, 
-  Search, 
+import {
+  ShieldCheck,
+  Users,
+  GraduationCap,
+  FileText,
+  Settings,
+  Download,
+  Plus,
+  Edit3,
+  Trash2,
+  CheckCircle2,
+  Clock,
+  PhoneCall,
+  Search,
   ArrowRight,
   MessageSquare,
   Sparkles,
-  Save
+  Save,
+  IndianRupee,
+  Copy,
+  Check,
+  Link as LinkIcon,
+  XCircle
 } from 'lucide-react';
 import { PageNavigationControls } from '../common/PageNavigationControls';
 
@@ -28,7 +33,7 @@ interface AdminScreenProps {
 }
 
 export const AdminScreen: React.FC<AdminScreenProps> = ({ setActivePage }) => {
-  const [activeTab, setActiveTab] = useState<'overview' | 'leads' | 'webinars' | 'settings'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'leads' | 'webinars' | 'enrollments' | 'settings'>('overview');
   const [leads, setLeads] = useState<Lead[]>([]);
   const [webinars, setWebinars] = useState<WebinarItem[]>(INITIAL_WEBINARS);
   const [siteConfig, setSiteConfig] = useState<SiteConfig>(DEFAULT_SITE_CONFIG);
@@ -36,6 +41,19 @@ export const AdminScreen: React.FC<AdminScreenProps> = ({ setActivePage }) => {
   const [searchLead, setSearchLead] = useState('');
   const [leadStatusFilter, setLeadStatusFilter] = useState('all');
   const [saveSuccess, setSaveSuccess] = useState(false);
+
+  // Excel Program manual enrollment / payments state
+  const [payments, setPayments] = useState<PaymentRecord[]>([]);
+  const [selectedExcelLeadId, setSelectedExcelLeadId] = useState('');
+  const [excelFirstName, setExcelFirstName] = useState('');
+  const [excelLastName, setExcelLastName] = useState('');
+  const [excelEmail, setExcelEmail] = useState('');
+  const [excelMobile, setExcelMobile] = useState('');
+  const [excelAmount, setExcelAmount] = useState('');
+  const [isGeneratingLink, setIsGeneratingLink] = useState(false);
+  const [generatedCheckoutUrl, setGeneratedCheckoutUrl] = useState<string | null>(null);
+  const [enrollmentError, setEnrollmentError] = useState<string | null>(null);
+  const [copiedLink, setCopiedLink] = useState(false);
 
   // New webinar form modal state
   const [isAddingWebinar, setIsAddingWebinar] = useState(false);
@@ -46,9 +64,10 @@ export const AdminScreen: React.FC<AdminScreenProps> = ({ setActivePage }) => {
   const [newWebinarTime, setNewWebinarTime] = useState('');
   const [newWebinarPrice, setNewWebinarPrice] = useState(siteConfig.webinarDefaultPriceINR);
 
-  // Fetch leads on mount
+  // Fetch leads & payments on mount
   useEffect(() => {
     fetchLeads();
+    fetchPayments();
   }, []);
 
   const fetchLeads = async () => {
@@ -64,6 +83,76 @@ export const AdminScreen: React.FC<AdminScreenProps> = ({ setActivePage }) => {
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const fetchPayments = async () => {
+    try {
+      const res = await fetch('/api/payments');
+      if (res.ok) {
+        const data = await res.json();
+        if (data.payments) setPayments(data.payments);
+      }
+    } catch (err) {
+      console.warn('Could not fetch payments from server:', err);
+    }
+  };
+
+  const handleSelectExcelLead = (leadId: string) => {
+    setSelectedExcelLeadId(leadId);
+    const lead = leads.find(l => l.id === leadId);
+    if (lead) {
+      setExcelFirstName(lead.firstName);
+      setExcelLastName(lead.lastName);
+      setExcelEmail(lead.email);
+      setExcelMobile(lead.mobile);
+    }
+  };
+
+  const handleGenerateExcelPaymentLink = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setEnrollmentError(null);
+    setGeneratedCheckoutUrl(null);
+
+    const amount = Number(excelAmount);
+    if (!excelFirstName.trim() || !excelEmail.trim() || !Number.isFinite(amount) || amount <= 0) {
+      setEnrollmentError('Candidate first name, email, and a positive amount are required.');
+      return;
+    }
+
+    setIsGeneratingLink(true);
+    try {
+      const res = await fetch('/api/payments/checkout-custom', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          firstName: excelFirstName.trim(),
+          lastName: excelLastName.trim(),
+          email: excelEmail.trim(),
+          mobile: excelMobile.trim(),
+          amountINR: amount,
+          leadId: selectedExcelLeadId || undefined,
+          createdBy: 'Admin Workspace'
+        })
+      });
+      const data = await res.json();
+      if (res.ok && data.success && data.checkoutUrl) {
+        setGeneratedCheckoutUrl(data.checkoutUrl);
+        fetchPayments();
+      } else {
+        setEnrollmentError(data.error || 'Could not generate payment link. Is Dodo Payments configured?');
+      }
+    } catch (err: any) {
+      setEnrollmentError('Network error while generating the payment link.');
+    } finally {
+      setIsGeneratingLink(false);
+    }
+  };
+
+  const handleCopyCheckoutUrl = () => {
+    if (!generatedCheckoutUrl) return;
+    navigator.clipboard.writeText(generatedCheckoutUrl);
+    setCopiedLink(true);
+    setTimeout(() => setCopiedLink(false), 2000);
   };
 
   const handleUpdateLeadStatus = async (leadId: string, status: 'new' | 'contacted' | 'scheduled' | 'converted') => {
@@ -261,6 +350,21 @@ export const AdminScreen: React.FC<AdminScreenProps> = ({ setActivePage }) => {
             <span>Manage Webinars</span>
             <span className="px-1.5 py-0.2 rounded-full bg-[#dae2ff] text-[#001947] text-[10px]">
               {webinars.length}
+            </span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('enrollments')}
+            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+              activeTab === 'enrollments'
+                ? 'bg-[#002869] text-white'
+                : 'bg-white text-[#434652] hover:bg-[#e0e8ff] border border-[#e0e8ff]'
+            }`}
+          >
+            <IndianRupee className="w-3.5 h-3.5" />
+            <span>Excel Enrollment & Payments</span>
+            <span className="px-1.5 py-0.2 rounded-full bg-[#dae2ff] text-[#001947] text-[10px]">
+              {payments.length}
             </span>
           </button>
 
@@ -606,6 +710,212 @@ export const AdminScreen: React.FC<AdminScreenProps> = ({ setActivePage }) => {
                   </div>
                 </div>
               ))}
+            </div>
+
+          </div>
+        )}
+
+        {/* TAB: EXCEL PROGRAM MANUAL ENROLLMENT & PAYMENTS */}
+        {activeTab === 'enrollments' && (
+          <div className="flex flex-col gap-6">
+
+            <div className="bg-white rounded-3xl p-6 sm:p-8 border border-[#cbdaff] shadow-xs flex flex-col gap-5">
+              <div>
+                <h3 className="text-lg font-bold text-[#061b3b]">Excel Program — Manual Enrollment</h3>
+                <p className="text-xs text-[#747783] mt-1">
+                  Excel (Executive & Premium) is custom-priced per candidate. After agreeing on a fee, enter it here
+                  to generate a secure Dodo Payments checkout link for that candidate. Explore and Elevate use fixed
+                  prices and don't need this — candidates are redirected to payment automatically from the website.
+                </p>
+              </div>
+
+              <form onSubmit={handleGenerateExcelPaymentLink} className="flex flex-col gap-4">
+                <div>
+                  <label className="block text-xs font-bold text-[#061b3b] mb-1">
+                    Prefill from an existing lead <span className="text-[#747783] font-normal">(optional)</span>
+                  </label>
+                  <select
+                    value={selectedExcelLeadId}
+                    onChange={(e) => handleSelectExcelLead(e.target.value)}
+                    className="w-full px-3 py-2.5 bg-[#f9f9ff] border border-[#cbdaff] rounded-xl text-xs cursor-pointer"
+                  >
+                    <option value="">— Enter candidate details manually below —</option>
+                    {leads.map(l => (
+                      <option key={l.id} value={l.id}>
+                        {l.fullName} • {l.email} ({l.planInterest || l.source})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                  <div>
+                    <label className="block text-xs font-bold text-[#061b3b] mb-1">First Name *</label>
+                    <input
+                      type="text"
+                      required
+                      value={excelFirstName}
+                      onChange={(e) => setExcelFirstName(e.target.value)}
+                      className="w-full px-3 py-2.5 bg-[#f9f9ff] border border-[#cbdaff] rounded-xl text-xs"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-[#061b3b] mb-1">Last Name</label>
+                    <input
+                      type="text"
+                      value={excelLastName}
+                      onChange={(e) => setExcelLastName(e.target.value)}
+                      className="w-full px-3 py-2.5 bg-[#f9f9ff] border border-[#cbdaff] rounded-xl text-xs"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-[#061b3b] mb-1">Email *</label>
+                    <input
+                      type="email"
+                      required
+                      value={excelEmail}
+                      onChange={(e) => setExcelEmail(e.target.value)}
+                      className="w-full px-3 py-2.5 bg-[#f9f9ff] border border-[#cbdaff] rounded-xl text-xs"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-[#061b3b] mb-1">Mobile</label>
+                    <input
+                      type="tel"
+                      value={excelMobile}
+                      onChange={(e) => setExcelMobile(e.target.value)}
+                      className="w-full px-3 py-2.5 bg-[#f9f9ff] border border-[#cbdaff] rounded-xl text-xs"
+                    />
+                  </div>
+                </div>
+
+                <div className="max-w-xs">
+                  <label className="block text-xs font-bold text-[#061b3b] mb-1">Agreed Fee (INR) *</label>
+                  <div className="relative">
+                    <IndianRupee className="w-4 h-4 text-[#747783] absolute left-3 top-1/2 -translate-y-1/2" />
+                    <input
+                      type="number"
+                      required
+                      min={1}
+                      placeholder="e.g. 49999"
+                      value={excelAmount}
+                      onChange={(e) => setExcelAmount(e.target.value)}
+                      className="w-full pl-9 pr-3 py-2.5 bg-[#f9f9ff] border border-[#cbdaff] rounded-xl text-xs font-bold text-[#006e29]"
+                    />
+                  </div>
+                </div>
+
+                {enrollmentError && (
+                  <div className="p-3 bg-red-50 border border-red-200 text-red-700 text-xs font-bold rounded-xl flex items-center gap-2">
+                    <XCircle className="w-4 h-4 shrink-0" />
+                    <span>{enrollmentError}</span>
+                  </div>
+                )}
+
+                <div>
+                  <button
+                    type="submit"
+                    disabled={isGeneratingLink}
+                    className="px-6 py-2.5 bg-[#002869] hover:bg-[#0b3d91] text-white text-xs font-bold rounded-xl shadow-xs transition-all flex items-center gap-2 cursor-pointer disabled:opacity-50"
+                  >
+                    <LinkIcon className="w-3.5 h-3.5" />
+                    <span>{isGeneratingLink ? 'Generating…' : 'Generate Payment Link'}</span>
+                  </button>
+                </div>
+              </form>
+
+              {generatedCheckoutUrl && (
+                <div className="p-4 rounded-2xl bg-[#f1f3ff] border border-[#cbdaff] flex flex-col gap-3">
+                  <div className="flex items-center gap-2 text-xs font-bold text-[#006e29]">
+                    <CheckCircle2 className="w-4 h-4" />
+                    <span>Payment link generated. Share it with the candidate to complete enrollment.</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="text"
+                      readOnly
+                      value={generatedCheckoutUrl}
+                      className="flex-1 px-3 py-2 bg-white border border-[#cbdaff] rounded-xl text-xs font-mono text-[#002869]"
+                    />
+                    <button
+                      onClick={handleCopyCheckoutUrl}
+                      className="px-3 py-2 bg-[#002869] text-white text-xs font-bold rounded-xl flex items-center gap-1 hover:bg-[#0b3d91] cursor-pointer shrink-0"
+                    >
+                      {copiedLink ? <Check className="w-3.5 h-3.5 text-[#79fd8d]" /> : <Copy className="w-3.5 h-3.5" />}
+                      <span>{copiedLink ? 'Copied' : 'Copy'}</span>
+                    </button>
+                    {excelMobile && (
+                      <a
+                        href={`https://wa.me/${excelMobile.replace(/[^0-9]/g, '')}?text=${encodeURIComponent(`Hi ${excelFirstName}, here's your secure payment link to complete enrollment for the Excel Program: ${generatedCheckoutUrl}`)}`}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="px-3 py-2 bg-[#006e29] text-white text-xs font-bold rounded-xl flex items-center gap-1 hover:bg-[#00531d] cursor-pointer shrink-0"
+                      >
+                        <PhoneCall className="w-3.5 h-3.5" />
+                        <span>WhatsApp</span>
+                      </a>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Payments Ledger */}
+            <div className="bg-white rounded-3xl p-6 sm:p-8 border border-[#cbdaff] shadow-xs flex flex-col gap-5">
+              <div className="flex items-center justify-between">
+                <h3 className="text-lg font-bold text-[#061b3b]">All Payments (Explore, Elevate & Excel)</h3>
+                <button
+                  onClick={fetchPayments}
+                  className="px-3.5 py-2 bg-[#002869] text-white rounded-xl text-xs font-bold hover:bg-[#0b3d91] cursor-pointer"
+                >
+                  Refresh
+                </button>
+              </div>
+
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs border-collapse">
+                  <thead>
+                    <tr className="border-b border-gray-200 bg-[#f9f9ff] text-[#747783] font-bold">
+                      <th className="p-3">Candidate</th>
+                      <th className="p-3">Plan</th>
+                      <th className="p-3">Amount</th>
+                      <th className="p-3">Status</th>
+                      <th className="p-3">Created</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {payments.map((p) => (
+                      <tr key={p.id} className="hover:bg-[#f9f9ff] transition-colors">
+                        <td className="p-3">
+                          <strong className="text-[#061b3b] block">{p.candidateName}</strong>
+                          <span className="text-[#747783] text-[11px]">{p.candidateEmail}</span>
+                        </td>
+                        <td className="p-3 font-semibold text-[#061b3b]">{p.planName}</td>
+                        <td className="p-3 font-bold text-[#006e29]">₹{p.amountINR.toLocaleString('en-IN')}</td>
+                        <td className="p-3">
+                          <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                            p.status === 'succeeded' ? 'bg-[#79fd8d]/30 text-[#00531d]' :
+                            p.status === 'failed' || p.status === 'cancelled' ? 'bg-red-100 text-red-700' :
+                            'bg-[#dae2ff] text-[#001947]'
+                          }`}>
+                            {p.status}
+                          </span>
+                        </td>
+                        <td className="p-3 text-[11px] text-[#747783] whitespace-nowrap">
+                          {new Date(p.createdAt).toLocaleString('en-IN')}
+                        </td>
+                      </tr>
+                    ))}
+                    {payments.length === 0 && (
+                      <tr>
+                        <td colSpan={5} className="p-6 text-center text-[#747783]">
+                          No payments recorded yet.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
             </div>
 
           </div>
