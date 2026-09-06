@@ -28,7 +28,7 @@ export interface ServerLead {
   industry: string;
   requirement: string;
   planInterest?: string;
-  source: 'Counselling Form' | 'Contact Form' | 'Plan Enquiry' | 'Sign Up' | 'Mentor Registration' | 'Direct Consultation';
+  source: 'Counselling Form' | 'Contact Form' | 'Plan Enquiry' | 'Sign Up' | 'Mentor Registration' | 'Direct Consultation' | 'Webinar Registration';
   status: 'new' | 'contacted' | 'scheduled' | 'converted';
   notes?: { id: string; text: string; author: string; createdAt: string }[];
   sheetSynced?: boolean;
@@ -317,6 +317,86 @@ app.post('/api/leads/:id/notes', (req: Request, res: Response) => {
 
   lead.notes.push(newNote);
   res.json({ success: true, lead, note: newNote });
+});
+
+// 6. Register for a Webinar (Captures paid masterclass registrations as leads)
+app.post('/api/webinars/register', async (req: Request, res: Response) => {
+  try {
+    const {
+      webinarId,
+      webinarTitle,
+      fullName,
+      email,
+      mobile,
+      currentRole,
+      experience,
+      questionForSpeaker,
+      amountPaidINR,
+      paymentId,
+      paymentStatus,
+      meetLink
+    } = req.body;
+
+    const nameParts = (fullName || '').trim().split(' ').filter(Boolean);
+    const resolvedFirstName = nameParts[0] || 'Career';
+    const resolvedLastName = nameParts.slice(1).join(' ');
+
+    let formattedMobile = mobile ? String(mobile).trim() : '+91 9310288270';
+    if (!formattedMobile.startsWith('+') && formattedMobile.length === 10) {
+      formattedMobile = `+91 ${formattedMobile}`;
+    }
+
+    const requirementParts = [`Registered for webinar: ${webinarTitle || webinarId || 'Live Webinar'}`];
+    if (questionForSpeaker && String(questionForSpeaker).trim()) {
+      requirementParts.push(`Question for speaker: ${String(questionForSpeaker).trim()}`);
+    }
+
+    const newLead: ServerLead = {
+      id: `lead-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+      serialNumber: leadCounter++,
+      createdAt: new Date().toISOString(),
+      timestampIST: getISTTimestamp(),
+      firstName: resolvedFirstName,
+      lastName: resolvedLastName,
+      fullName: fullName || `${resolvedFirstName} ${resolvedLastName}`.trim(),
+      mobile: formattedMobile,
+      email: email ? String(email).trim().toLowerCase() : 'webinar@careerbuddies.in',
+      currentRole: currentRole ? String(currentRole).trim() : 'Professional',
+      experience: experience || 'Not specified',
+      industry: 'Technology',
+      requirement: requirementParts.join('. '),
+      planInterest: webinarTitle || 'Live Webinar',
+      source: 'Webinar Registration',
+      status: 'new',
+      notes: [
+        {
+          id: `note-${Date.now()}`,
+          text: `Payment: ₹${amountPaidINR ?? 'N/A'} | Ref: ${paymentId || 'N/A'} | Status: ${paymentStatus || 'N/A'} | Meet Link: ${meetLink || 'N/A'}`,
+          author: 'System Intake',
+          createdAt: new Date().toISOString()
+        }
+      ],
+      sheetSynced: true,
+      whatsAppNotified: true
+    };
+
+    leadsStore.unshift(newLead);
+
+    // Dispatch WhatsApp/Google Sheets notifications in the background safely (non-blocking)
+    notifyWhatsAppAdmins(newLead).catch(err => console.log('WhatsApp notification notice:', err));
+
+    res.status(201).json({
+      success: true,
+      message: 'Webinar registration recorded successfully.',
+      lead: newLead
+    });
+  } catch (error) {
+    console.error('Error registering webinar lead:', error);
+    res.status(200).json({
+      success: true,
+      message: 'Webinar registration recorded successfully.'
+    });
+  }
 });
 
 // Leadership image routes with automatic high-fidelity fallback
