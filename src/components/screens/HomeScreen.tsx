@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { MOCK_MENTORS, STRUCTURED_SERVICES, CAREER_PLANS, MOCK_FAQS } from '../../data/mockData';
+import { STRUCTURED_SERVICES, CAREER_PLANS, MOCK_FAQS } from '../../data/mockData';
 import { DEFAULT_SITE_CONFIG, JOURNEY_TIMELINE } from '../../config/siteConfig';
 import { Mentor, PageView, ServiceItem, PlanItem } from '../../types';
 import { BrandTagline } from '../BrandTagline';
@@ -56,7 +56,6 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   setActivePage,
   onSelectLeader
 }) => {
-  const featuredMentors = MOCK_MENTORS.slice(0, 3);
   const previewServices = STRUCTURED_SERVICES.slice(0, 6);
 
   // Quick Hero Lead Capture Form state
@@ -793,64 +792,6 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
               <span>Explore All Mentors</span>
               <ArrowRight className="w-3.5 h-3.5" />
             </button>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8 items-stretch">
-            {featuredMentors.map((mentor) => (
-              <div
-                key={mentor.id}
-                className="bg-gradient-to-b from-[#002869] to-[#001f52] rounded-3xl border border-[#1b3d7a] hover:border-[#79fd8d]/50 p-6 sm:p-7 flex flex-col justify-between transition-all duration-200 shadow-md hover:shadow-xl group"
-              >
-                <div>
-                  <div className="flex items-center gap-4 mb-4">
-                    <img
-                      src={mentor.avatar}
-                      alt={mentor.name}
-                      className="w-16 h-16 rounded-2xl object-cover border border-white/20 shadow-xs shrink-0"
-                    />
-                    <div className="flex flex-col min-w-0">
-                      <h4 
-                        onClick={() => onSelectMentor(mentor)}
-                        className="font-bold text-base text-white group-hover:text-[#79fd8d] transition-colors cursor-pointer truncate font-['Plus_Jakarta_Sans',sans-serif]"
-                      >
-                        {mentor.name}
-                      </h4>
-                      <span className="text-xs font-semibold text-[#79fd8d] truncate">{mentor.title}</span>
-                      <span className="text-[11px] text-[#dae2ff]/80 truncate font-medium">{mentor.company}</span>
-                    </div>
-                  </div>
-
-                  <p className="text-xs text-[#dae2ff]/90 leading-relaxed line-clamp-3 mb-4">
-                    {mentor.bio}
-                  </p>
-
-                  <div className="flex flex-wrap gap-1.5 mb-5">
-                    {mentor.skills.slice(0, 3).map((sk, idx) => (
-                      <span
-                        key={idx}
-                        className="px-2.5 py-0.5 rounded-md bg-white/10 text-[#dae2ff] text-[10px] font-semibold border border-white/15"
-                      >
-                        {sk}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="pt-4 border-t border-white/15 flex items-center justify-between gap-3">
-                  <div className="flex items-baseline gap-1">
-                    <span className="text-base font-extrabold text-white">${mentor.hourlyRate}</span>
-                    <span className="text-[10px] text-[#dae2ff]/70 font-medium">/ session</span>
-                  </div>
-
-                  <button
-                    onClick={() => onBookMentor(mentor)}
-                    className="px-4 py-2 bg-white hover:bg-[#eef3fc] text-[#002869] text-xs font-bold rounded-xl transition-all shadow-2xs hover:shadow-xs cursor-pointer shrink-0"
-                  >
-                    Book Master Session
-                  </button>
-                </div>
-              </div>
-            ))}
           </div>
 
         </div>
