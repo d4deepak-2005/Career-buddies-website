@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   PageView, 
   Mentor, 
@@ -45,9 +45,22 @@ import { ArticleReaderModal } from './components/modals/ArticleReaderModal';
 import { WebinarDetailModal } from './components/modals/WebinarDetailModal';
 import { WebinarCheckoutModal } from './components/modals/WebinarCheckoutModal';
 
+// Deep links such as careerbuddies.in/#programmes open that page directly
+const DEEP_LINK_PAGES: PageView[] = ['programmes', 'plans', 'webinars', 'mentors', 'contact'];
+const pageFromHash = (): PageView => {
+  const h = window.location.hash.replace('#', '') as PageView;
+  return DEEP_LINK_PAGES.includes(h) ? h : 'home';
+};
+
 export default function App() {
   // Navigation Page State
-  const [activePage, setActivePage] = useState<PageView>('home');
+  const [activePage, setActivePage] = useState<PageView>(pageFromHash);
+
+  useEffect(() => {
+    const onHashChange = () => setActivePage(pageFromHash());
+    window.addEventListener('hashchange', onHashChange);
+    return () => window.removeEventListener('hashchange', onHashChange);
+  }, []);
 
   // Modals State
   const [isSmartMatchingOpen, setIsSmartMatchingOpen] = useState(false);
