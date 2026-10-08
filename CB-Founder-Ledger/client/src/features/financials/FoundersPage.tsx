@@ -21,9 +21,9 @@ export function FoundersPage() {
     <div className="space-y-4">
       <p className="text-sm text-ink-muted">Paid, fair share and net position for each founder, calculated from approved transactions only.</p>
       <CalcNotes reconciliation={reconciliation} warnings={warnings} excludedPending={pending} currency={currency} />
-      <ul className="grid gap-4 md:grid-cols-2 xl:grid-cols-3" aria-label="Founder positions">
+      <ul className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3" aria-label="Founder positions">
         {positions.map((p) => (
-          <li key={p.founderId} className="card p-5">
+          <li key={p.founderId} className="card min-w-0 p-5">
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
                 <h2 className="truncate text-lg font-extrabold text-cb-navy"><Link to={`/founders/${p.founderId}`} className="hover:underline">{p.founderName}</Link></h2>

@@ -74,6 +74,20 @@ check "no public receipt path"          "no" "$(curl -s "$BASE/receipts/" -o /de
 check "founder cannot void"             403 "$(code -b "$JAR_F" -X POST -H "$J" -d '{"expectedVersion":2,"reason":"smoke test cleanup"}' "$BASE/api/transactions/$TX/void")"
 check "admin voids (reversal)"          200 "$(code -b "$JAR_A" -X POST -H "$J" -d '{"expectedVersion":2,"reason":"smoke test cleanup"}' "$BASE/api/transactions/$TX/void")"
 check "voided record still readable"    200 "$(code -b "$JAR_A" "$BASE/api/transactions/$TX")"
+# ---------------------------------------------------------------- Phase 3 Option C: reimbursement validation (nothing can be approved before Phase 5,
+# so the approved-expense path is exercised by tests/docker-reimbursement-e2e.sh, which approves via the database)
+TX2="$(post "$JAR_F" "${TXBODY/\[SMOKE\] expense/[SMOKE] expense-2}" /api/transactions | id_of)"
+RB="{\"type\":\"reimbursement\",\"amountMinor\":100000,\"transactionDate\":\"2026-05-03\",\"description\":\"[SMOKE] reimb $STAMP\",\"paidByFounderId\":\"$FA\""
+check "reimbursement WITHOUT link rejected"      400 "$(code -b "$JAR_F" -X POST -H "$J" -d "$RB}" "$BASE/api/transactions")"
+check "reimbursement -> unapproved expense"      400 "$(code -b "$JAR_F" -X POST -H "$J" -d "$RB,\"reimbursesTransactionId\":\"$TX2\"}" "$BASE/api/transactions")"
+check "reimbursement -> unknown expense"         400 "$(code -b "$JAR_F" -X POST -H "$J" -d "$RB,\"reimbursesTransactionId\":\"64b7f0f0f0f0f0f0f0f0f0f0\"}" "$BASE/api/transactions")"
+check "reimbursement -> malformed id"            400 "$(code -b "$JAR_F" -X POST -H "$J" -d "$RB,\"reimbursesTransactionId\":\"nope\"}" "$BASE/api/transactions")"
+check "operator injection in link rejected"      400 "$(code -b "$JAR_F" -X POST -H "$J" -d "$RB,\"reimbursesTransactionId\":{\"\$ne\":null}}" "$BASE/api/transactions")"
+check "expense cannot carry a link"              400 "$(code -b "$JAR_F" -X POST -H "$J" -d "${TXBODY%\}},\"reimbursesTransactionId\":\"$TX2\"}" "$BASE/api/transactions")"
+check "reimbursable-expenses needs sign-in"      401 "$(code "$BASE/api/transactions/reimbursable-expenses?paidByFounderId=$FA")"
+check "reimbursable-expenses needs founder id"   400 "$(code -b "$JAR_F" "$BASE/api/transactions/reimbursable-expenses")"
+check "reimbursable-expenses lists none (unapproved)" '{"expenses":[]}' "$(curl -s -b "$JAR_F" "$BASE/api/transactions/reimbursable-expenses?paidByFounderId=$FA")"
+check "voiding the unapproved test expense"      200 "$(code -b "$JAR_A" -X POST -H "$J" -d '{"expectedVersion":1,"reason":"smoke test cleanup"}' "$BASE/api/transactions/$TX2/void")"
 # cleanup: deactivate every [SMOKE] founder and category (nothing is deleted)
 for f in $(curl -s -b "$JAR_A" "$BASE/api/founders" | grep -o '"id":"[a-f0-9]\{24\}","name":"\[SMOKE\][^"]*"' | cut -d'"' -f4); do curl -s -o /dev/null -b "$JAR_A" -X PATCH -H "$J" -d '{"active":false}' "$BASE/api/founders/$f"; done
 for c in $(curl -s -b "$JAR_A" "$BASE/api/categories" | grep -o '"id":"[a-f0-9]\{24\}","name":"\[SMOKE\][^"]*"' | cut -d'"' -f4); do curl -s -o /dev/null -b "$JAR_A" -X PATCH -H "$J" -d '{"active":false}' "$BASE/api/categories/$c"; done

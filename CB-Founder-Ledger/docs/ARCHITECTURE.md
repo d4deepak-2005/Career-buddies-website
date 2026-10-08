@@ -36,10 +36,13 @@ The API is same-origin from the browser's point of view (nginx in Docker, Vite p
 | `modules/transactions/*.service.ts` | Create / edit / submit / void with validation, optimistic locking and history |
 | `domain/` | **Pure business rules**, no I/O: `splits.ts` (split validation + per-transaction allocation), `transactionRules.ts` (type rules, status lifecycle). Phase 3 will add the calculation/settlement engine here |
 | `domain/calculationEngine.ts`, `domain/settlementAlgorithm.ts` | **Phase 3 — the single source of truth for money results.** Pure functions over stored transactions + founders: fair share, paid, net position, outstanding, settlement recommendations, with a traceable per-transaction ledger of effects. Only `approved` transactions count |
+| `modules/transactions/reimbursements.ts` | **Option C**: reimbursement target checks, atomic capacity reservation/release on the expense (`reimbursedMinor`), linked-reimbursement lookups, picker query |
 | `modules/financials/*` | Loads founders + transactions (one query each, minimal fields), calls the engine, shapes read-only API responses. No caching; recomputed per request |
 | `storage/receiptStorage.ts` | `ReceiptStorage` interface + local private-directory implementation (swap for object storage) |
 | `lib/` | Password hashing, token helpers, `AppError`, `asyncHandler` |
 | `scripts/seedAdmin.ts` | Creates the first admin only. **No financial data.** |
+
+**Reimbursements (Option C).** A reimbursement is linked to one approved expense; the engine scales that expense's stored split to `amount − Σ linked reimbursements` and treats the reimbursed part as business-borne. Write-time safety (cap, concurrency, void guard) lives in `modules/transactions/reimbursements.ts` using one atomic conditional update; the engine independently recomputes everything and never trusts the counter. Net positions are zero-sum by construction. Details: [PHASE-3-CALCULATION-SPEC.md](PHASE-3-CALCULATION-SPEC.md).
 
 **Business logic location:** all financial rules live in `server/src/domain/` and are called by services; the client never calculates amounts (it formats and parses input only, asks the server to preview splits, and displays the engine's results — enforced by a test that scans the financial views for arithmetic on money values). The dashboard (Phase 4), approvals (5) and reports (7) must consume `calculationEngine` rather than re-deriving figures.
 
@@ -88,7 +91,7 @@ Tokens in `tailwind.config.js` come from the official logo/website palette: navy
 - **founders** — name, email?, userId? (unique link to a user), defaultSharePercent? (0–100), active.
 - **categories** — name, slug (unique, derived), description?, active.
 
-- **transactions** (embedded split), **transaction_revisions** (append-only), **receipts** (metadata only), **counters** — see PHASE-2.md.
+- **transactions** (embedded split; reimbursements carry `reimbursesTransactionId`, expenses carry the internal `reimbursedMinor` reservation counter), **transaction_revisions** (append-only), **receipts** (metadata only), **counters** — see PHASE-2.md.
 - categories also carry `isDevSeed`.
 
 Founders, categories and transactions are deactivated / voided, never deleted. Receipt bytes are never stored in MongoDB.

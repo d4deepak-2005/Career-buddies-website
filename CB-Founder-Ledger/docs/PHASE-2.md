@@ -164,3 +164,12 @@ Zod `.strict()` everywhere (unknown fields → 400, including `status`, `version
 * Two extra indexes (`counterpartyFounderId`, `split.entries.founderId`) for the founder ledger.
 
 Rationale and the full accounting treatment are in [PHASE-3-CALCULATION-SPEC.md](PHASE-3-CALCULATION-SPEC.md).
+
+## Amendment — Option C reimbursement link (Phase 3)
+
+* **Reimbursement** now requires `reimbursesTransactionId`: one **approved** `business_expense` with a payer; the reimbursed (`paidByFounderId`) founder must be that payer. The field is forbidden on every other type and cannot be removed once set.
+* Σ active reimbursements of an expense may not exceed its amount (`400 REIMBURSEMENT_EXCEEDS_EXPENSE` with `remainingMinor`). Capacity is reserved atomically on the expense (`reimbursedMinor`, internal, never client-writable).
+* An expense with active reimbursements cannot be voided (`409 HAS_LINKED_REIMBURSEMENTS`); void the reimbursement(s) first. Voiding a reimbursement frees its capacity.
+* `GET /api/transactions/reimbursable-expenses?paidByFounderId=<id>[&forReimbursementId=<id>]` — approved expenses of that founder that still have capacity (query is strict; both ids must be valid ObjectIds).
+* Transaction responses add `reimbursesTransactionId`, `reimbursesTransaction {id, txnNumber, description, amountMinor}`, and for expenses `reimbursedMinor`, `remainingReimbursableMinor`; the detail response adds `linkedReimbursements[]`.
+* New index `{reimbursesTransactionId: 1, status: 1}` (sparse).

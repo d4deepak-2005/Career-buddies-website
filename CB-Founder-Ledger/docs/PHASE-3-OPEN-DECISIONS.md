@@ -1,6 +1,6 @@
 # Phase 3 Open Decisions
 
-Status: **awaiting product-owner decisions.** Nothing in this document changes the calculation engine. The current behaviour is described exactly as implemented (commit `60c43a6`), and **no alternative has been selected**.
+Status: **Decision 1 is RESOLVED — Option C (expense-linked reimbursement) was chosen by the product owner and is implemented** (see the *Resolution* box below, [PHASE-3-OPTION-C-FEASIBILITY.md](PHASE-3-OPTION-C-FEASIBILITY.md) and [PHASE-3-CALCULATION-SPEC.md](PHASE-3-CALCULATION-SPEC.md)). Decisions 2–5 remain open and unchanged. The text of Decision 1 below is kept as the historical record of the question and of the superseded IA-4/IA-5 treatment (commit `60c43a6`).
 
 Source checked again for this document: the Product Plan PDF text (10 pages) and `docs/PHASE-3-CALCULATION-SPEC.md`. Every quotation below is from the PDF. Section numbers are the PDF's.
 
@@ -9,6 +9,12 @@ Labels are the same as in the spec: **PDF REQUIREMENT**, **INFERRED FROM PDF EXA
 ---
 
 ## Decision 1: Business-funded reimbursement
+
+> ### Resolution — Option C (implemented)
+> **Chosen:** a reimbursement must reference exactly one approved business expense (`reimbursesTransactionId`). The reimbursed portion is **business-borne**; founders share only `expense − Σ linked reimbursements`, split by the expense's stored split with largest-remainder rounding. The payer's *paid* falls by the reimbursed amount, so net positions sum to exactly 0 with **no** attribution rule, fake founder, capital pool or `PASS_WITH_EXTERNAL` status.
+> **Answers to the three questions at the end of this section:** (1) the reimbursed part is excluded from what founders owe each other, and the rest is shared as the expense was split; (2) **yes**, the link is mandatory (a Phase 2 data change, amended in PHASE-2.md); (3) no business account or capital pool is modelled (Decision 3 stays open).
+> **Guarantees:** over-reimbursement is rejected, including concurrent attempts (atomic reservation); an expense with active reimbursements cannot be voided; voiding a reimbursement restores the founder-funded amount; nothing is deleted.
+> **Label:** the decision is a product-owner choice recorded as IMPLEMENTATION ASSUMPTION IA-4 in the spec (the PDF is still silent). IA-5 no longer exists.
 
 ### What the PDF explicitly says
 
@@ -95,7 +101,7 @@ Please decide, in your own words:
 2. **Must a reimbursement be linked to the specific expense it reimburses?** (If yes, this is a Phase 2 data change.)
 3. **Where does business money come from?** (Is a business account / capital pool wanted, now or later? See Decision 3.)
 
-Until this is decided, the engine keeps behaviour **A**, clearly labelled as an assumption in the spec and surfaced in the UI as an "external" amount.
+~~Until this is decided, the engine keeps behaviour **A**.~~ **Decided: Option C — see the Resolution box above.**
 
 ---
 
@@ -153,7 +159,7 @@ Until this is decided, the engine keeps behaviour **A**, clearly labelled as an 
 
 | # | Topic | PDF explicit rule? | Current treatment | Label |
 |---|---|---|---|---|
-| 1 | Business-funded reimbursement → founder balances | **No** | External amount + pro-rata attribution (IA-4, IA-5) | IMPLEMENTATION ASSUMPTION |
+| 1 | Business-funded reimbursement → founder balances | **No** | **RESOLVED — Option C:** linked to one approved expense; business-borne; founders share the funded remainder (IA-4, IA-5b, IA-5c) | IMPLEMENTATION ASSUMPTION (product-owner decision) |
 | 2 | Founder-to-founder reimbursement | **No** (both definitions could apply) | Entered as Settlement | IMPLEMENTATION ASSUMPTION |
 | 3 | Capital pool | **No** | Not modelled | PHASE 3 LIMITATION |
 | 4 | Loan repayment | **No** | Not modelled | PHASE 3 LIMITATION |

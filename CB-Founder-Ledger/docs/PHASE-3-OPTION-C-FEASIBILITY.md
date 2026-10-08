@@ -1,7 +1,6 @@
 # Phase 3 — Option C Feasibility Review (expense-linked reimbursement)
 
-**Status: design review only. Nothing is implemented, no policy is chosen.**
-No source code, tests, data model or database was changed for this document (commit base `a9ee81d`).
+**Status: APPROVED by the product owner and IMPLEMENTED in Phase 3** (see the *Implementation* section at the end of this file). The body below is the feasibility review exactly as written before implementation (commit base `a9ee81d`, no code changed at that time); the prototype figures were reproduced by the production tests.
 Phase 4 is not started.
 
 All figures were produced by a **throwaway prototype** that reused the unmodified Phase 2/3 helpers (`allocateByWeights`, `recommendSettlements`) and ran the **current** engine for the IA-5 side of every comparison. The prototype was deleted afterwards; `git status` was clean before and after. Amounts are in ₹.
@@ -321,3 +320,20 @@ If you prefer to keep founders responsible for the reimbursed portion, the same 
 * Throwaway prototype of Option C (deleted) cross-checked against the current engine for IA-5.
 * Current full suites (unchanged): **server 249 passed / 0 failed (16 files); client 48 passed / 0 failed (5 files).**
 * Repository: no source, test, schema or database changes; working tree clean before the document was added.
+
+---
+
+## Implementation (added after approval)
+
+| Item | As built |
+|---|---|
+| Field | `reimbursesTransactionId` (ObjectId → Transaction), indexed `{reimbursesTransactionId: 1, status: 1}` (sparse). Required for `reimbursement`, forbidden for every other type (`transactionRules.ts`, `linkedExpense`). Plus an internal counter `reimbursedMinor` on the **expense** (capacity reservation, see below) |
+| Target rules | exists · `business_expense` · `approved` · has a payer · payer = reimbursed founder (`UNKNOWN_TARGET`, `TARGET_NOT_EXPENSE`, `TARGET_NOT_APPROVED`, `TARGET_NO_PAYER`, `PAYER_MISMATCH`) |
+| Cap | Σ active (draft/pending/approved) reimbursements ≤ expense amount. **Enforced atomically**: a conditional `$expr` update on the expense reserves capacity *before* the reimbursement is inserted; released on rollback, void, edit-down/away/move. Answer to feasibility question on concurrency: tested with 5 simultaneous requests (exactly 3 of ₹1,000 fit in ₹3,000) |
+| Expense void | Blocked with `409 HAS_LINKED_REIMBURSEMENTS` while any active reimbursement exists; the void write itself is conditional on `reimbursedMinor ∈ {0, null}` (closes the race with a concurrent reimbursement) |
+| Engine | Per expense `founderFunded = amount − Σ valid linked reimbursements`; stored split scaled by `allocateByWeights`. The engine never reads `reimbursedMinor`; it recomputes and excludes bad records with named warnings. `npm --prefix server run reconcile:reimbursements` detects counter drift |
+| Removed | IA-5 attribution, `businessFundedShareMinor`, `founderBalanceMinor`, `externalMinor`, `PASS_WITH_EXTERNAL` |
+| UI | Add/Edit Transaction: *Expense Picker* (approved expenses of the chosen payer with their remaining amount); detail pages show the link both ways; financial pages say "reimbursed by the business" |
+| Out of scope (unchanged) | multi-payer expenses, loan repayment, refund linking, capital pool |
+
+Figures in this review for the IA-5 side are historical; the Option C side matches the production tests (`accountingReview`, `reimbursements`).

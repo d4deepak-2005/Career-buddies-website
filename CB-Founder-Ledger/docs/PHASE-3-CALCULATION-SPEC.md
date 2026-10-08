@@ -1,4 +1,4 @@
-# Phase 3 — Calculation Specification (accounting review revision)
+# Phase 3 — Calculation Specification (Option C: expense-linked reimbursement)
 
 Scope (product plan §21): *fair share, founder balances, net positions and settlement calculations.*
 
@@ -11,29 +11,21 @@ Every rule in this document carries **exactly one** of four labels. They are not
 | **IMPLEMENTATION ASSUMPTION** | The PDF is silent. A decision was needed to make the engine well-defined. Needs product-owner confirmation. |
 | **PHASE 3 LIMITATION** | Something the system deliberately does *not* model yet. |
 
-> **Open product decisions** (IA-4, IA-5, founder-to-founder reimbursement, capital pool, loan repayment, refund linking) are set out, with alternatives and risks, in [PHASE-3-OPEN-DECISIONS.md](PHASE-3-OPEN-DECISIONS.md). The behaviour below is unchanged until the product owner decides.
+> **Product decision taken: Option C.** Reimbursement is linked to the one approved business expense it reimburses; the reimbursed part is *business-borne* and founders share only the founder-funded remainder. This replaces the earlier IA-4/IA-5 "external amount" treatment entirely (no attribution rule remains). Other open decisions (founder-to-founder reimbursement, capital pool, loan repayment, refund linking) stay open — see [PHASE-3-OPEN-DECISIONS.md](PHASE-3-OPEN-DECISIONS.md) and [PHASE-3-OPTION-C-FEASIBILITY.md](PHASE-3-OPTION-C-FEASIBILITY.md).
 
 > **Phase 4+ is not built.** No dashboard KPIs/charts, approval workflow or approve/reject UI, recurring expenses, reports, hardening or launch work.
 
 ---
 
-## 1. What changed in this review
+## 1. What changed in Option C
 
-An accounting review of the first Phase 3 version found one real flaw and several unclear statements.
+History: the first Phase 3 version made reimbursements distort balances; the accounting review (commit `60c43a6`) kept a separate *external amount* and attributed it to founders pro-rata (IA-5), which the product owner then chose to replace with Option C (see Open Decisions). **Option C removes the need for any attribution rule**: because a reimbursement now names the expense it pays back, the engine knows exactly whose responsibility shrank.
 
-**Flaw (reproduced, then fixed): reimbursements made founder balances misleading.** The first version offset the reimbursed founder's *paid* amount and left the rest as a leftover, so founders' net positions no longer summed to zero. Two demonstrated symptoms:
+* Per expense: `founderFunded = amount − Σ valid linked reimbursements`. The expense's *stored* split is scaled to `founderFunded` with the Phase 2 largest-remainder rounding. The reimbursed portion is **business-borne** (shown, informational, never a balance).
+* The paying founder's *paid* for that expense is `amount − reimbursed`, so **Σ net positions = 0 exactly**, with or without reimbursements. There is no external remainder, no fake founder, no capital pool.
+* The cap (Σ active reimbursements ≤ expense) is enforced at write time, atomically, and re-checked by the engine.
 
-* A paid a 3,000 expense shared equally; the business reimbursed A 3,000. All three founders showed **"To pay 1,000"**, although there is nobody to pay.
-* A paid 3,000; the business reimbursed A 1,000. B and C are in *identical* positions, yet the recommendation made B pay A 1,000 and left C's identical 1,000 "unresolved". Which of the two was settled depended only on the tie-break by id: **arbitrary**.
-
-**Fix:** the engine now keeps two layers apart.
-
-1. **Founder-to-founder balance** — what founders owe *each other*. Always sums to exactly 0. Settlement recommendations use only this layer.
-2. **External (business-funded) amount** — money paid from business funds (reimbursements). Reported explicitly, never owed to or by a founder, never part of a payment between founders.
-
-Other changes: an explicit over-settlement flag; refund diagnostics; "Other" clarified as diagnostics-only; a stronger reconciliation block with a named status and per-check results. **Net position is unchanged** (`paid − fair share`).
-
-No fake founder and no capital pool was introduced.
+**Net position is unchanged** (`paid − fair share`, labelled INFERRED FROM PDF EXAMPLE).
 
 ---
 
@@ -70,8 +62,10 @@ No fake founder and no capital pool was introduced.
 | IA-1 | A `settlement` **transaction is the settlement record** (payer = paid-by, receiver = counterparty, amount, status, date, optional method). No separate `settlements` collection. | PDF lists both a Settlement type (§7) and a settlements collection (§17); two sources would double-count. |
 | IA-2 | **Official = status `approved` only.** Draft, pending, rejected and voided never affect a figure. | PDF-1/PDF-2 name approved/rejected only; excluding draft/pending/voided follows from "approved transactions affect official calculations" and PDF-8. |
 | IA-3 | Business expense: the paid-by founder paid the full amount; each split founder bears their **stored** `allocatedMinor` (the Phase 2 resolver is not re-run). | PDF-9 defines splits but not how they feed *paid*. |
-| IA-4 | **Reimbursement is business-funded.** It reduces the reimbursed founder's *paid* by the amount, adds **no** expense and changes **no** fair share, so the expense is counted once. The business-funded total is the **external amount**. | PDF-6 says "business/founder" without saying which; Phase 2 stores no reimbursing party. A *founder* reimbursing another founder is a **Settlement**. |
-| IA-5 | **Attribution of the external amount.** To keep founder-to-founder balances zero-sum, the external total *R* is attributed to founders **in proportion to their fair share** (largest-remainder rounding, the Phase 2 helper; if no founder has a positive fair share, to the reimbursed founders themselves). Founder-to-founder balance = net position + that share. This equals "each founder's fair share of the amount the founders themselves funded". | Without an attribution the recommendation is arbitrary (§1). Pro-rata is the neutral choice; it is isolated in one block of `calculationEngine.ts` and easy to change. |
+| IA-4 | **Reimbursement is business-funded and expense-linked (Option C — product-owner decision).** A reimbursement must reference exactly one **approved** business expense with exactly one payer (`reimbursesTransactionId`); the reimbursed founder must be that payer; the field is forbidden on every other type. The reimbursed amount is **business-borne**. For the linked expense the engine uses `founderFunded = amount − Σ valid linked reimbursements`, allocates it over the expense's **stored** split (largest remainder), and the payer's *paid* for it is `amount − reimbursed`. A *founder* reimbursing another founder is still a **Settlement**. | PDF-6 says "business/founder" and never says which expense. The link is what makes the effect on responsibility exact instead of attributed. |
+| IA-5 | ~~Attribution of the external amount~~ — **REMOVED by Option C.** No attribution rule, `businessFundedShare`, `founderBalance`, `externalMinor` or `PASS_WITH_EXTERNAL` status exists any more. | The link makes it unnecessary. |
+| IA-5b | **Cap and concurrency.** Σ of active reimbursements (draft, pending, approved) of one expense may not exceed its amount. Capacity is **reserved atomically** on the expense (`reimbursedMinor`, a conditional `$expr` update) before the reimbursement is written, and released when the reimbursement is voided, edited down/away, moved, or its write fails. An expense cannot be voided while it holds active reimbursements (void them first). The engine **never reads the counter**: it recomputes from the linked records in (date, number, id) order and excludes any over-cap record with `REIMBURSEMENT_EXCEEDS_EXPENSE`. `npm --prefix server run reconcile:reimbursements` detects counter drift. | Two concurrent requests must not both pass an application-level check. |
+| IA-5c | **Engine exclusions (each a named `warning`, record excluded, never repaired):** `REIMBURSEMENT_NOT_LINKED`, `_TARGET_MISSING`, `_TARGET_INVALID` (not a business expense), `_TARGET_NOT_OFFICIAL` (not approved), `_PAYER_MISMATCH`, `_EXCEEDS_EXPENSE`. Status becomes `REVIEW`. | Legacy or raw-written data may predate the rule. |
 | IA-6 | **Refund** of F received by founder P with split S: reduces P's *paid* by F and each split founder's *fair share* by their allocation. The original expense is never edited and keeps its own effects. Phase 2 now requires a refund to have the receiving founder and a split. | PDF-6 gives only the definition; no link to an original expense exists. |
 | IA-7 | **Contribution** is reported as `contributionMinor` only. It is not in paid, fair share, net position or any settlement. | PDF-5/PDF-6 list it as a separate metric; mixing capital with expense responsibility is explicitly avoided. |
 | IA-8 | **Loan principal** is reported as `loanOutstandingMinor` only (sum of approved loan principal). It is never in paid, fair share, net position or settlement. | PDF-5 lists "founder loan outstanding". |
@@ -79,7 +73,7 @@ No fake founder and no capital pool was introduced.
 | IA-10 | **Over-settlement is allowed and explicit.** If settlements move a founder past zero (they paid or received more than was due), `overSettledMinor` is set, an `OVER_SETTLED` warning is raised and reconciliation status becomes `REVIEW`. The sign is never hidden or clamped. | A payment cannot be rejected after the fact; hiding it would misstate balances. |
 | IA-11 | **`Other` transactions are diagnostics only.** Each approved `Other` is reported once as an `info` diagnostic (`OTHER_NOT_CALCULATED`) and counted in `excluded.unclassifiedOther`. **That count is not a financial total**; their amounts are never summed, never in any figure, and never affect reconciliation status. | PDF §7 gives "Other" no accounting meaning (only "controlled fallback with mandatory notes"). |
 | IA-12 | **Invalid approved transactions are excluded and reported, never repaired.** Invalid = non-positive/non-integer amount, split not summing to the amount, unknown/duplicate founder in a split, missing paid-by, settlement with equal or unknown parties. Each yields a `warning` with the transaction id. Status becomes `REVIEW`. | Data may predate a rule; guessing would invent numbers. |
-| IA-13 | **Diagnostics that do not exclude anything** (the records are valid but look inconsistent): `REFUNDS_EXCEED_EXPENSES`, `NEGATIVE_FAIR_SHARE` (a founder's refunds exceed their share; the value is **kept**, not clamped, so zero-sum holds), `REIMBURSEMENTS_EXCEED_EXPENSES`, `REIMBURSED_MORE_THAN_PAID`, `OVER_SETTLED`. | Cannot be prevented without a link between a refund/reimbursement and an expense (L-3). |
+| IA-13 | **Diagnostics that do not exclude anything** (the records are valid but look inconsistent): `REFUNDS_EXCEED_EXPENSES`, `NEGATIVE_FAIR_SHARE` (a founder's refunds exceed their share; the value is **kept**, not clamped, so zero-sum holds), `OVER_SETTLED`. (The reimbursement diagnostics `REIMBURSEMENTS_EXCEED_EXPENSES` and `REIMBURSED_MORE_THAN_PAID` were removed: the link prevents and names those cases, IA-5c.) | Refunds are still not linked to an expense (L-3). |
 | IA-14 | Every founder profile is listed (active or not); inactive founders keep their balances. | A leaver can still owe or be owed. |
 | IA-15 | All signed-in founders and admins can read all figures and all diagnostics. | Same visibility as the transactions themselves (Phase 2 A8). |
 | IA-16 | Everything is recomputed from the database on each request; no cache. | PDF-3: never stale. |
@@ -89,12 +83,13 @@ No fake founder and no capital pool was introduced.
 
 | ID | Limitation |
 |---|---|
-| L-1 | **No business capital pool or business account is modelled.** Contributions are informational (IA-7). The external amount is shown, not tied to a pool. |
+| L-1 | **No business capital pool or business account is modelled.** Contributions are informational (IA-7). The business-borne amount is shown, not tied to a pool. |
 | L-2 | **Loan repayment is not modelled** (the PDF defines no repayment record). Outstanding = principal. |
-| L-3 | Refunds and reimbursements are **not linked** to a specific expense, so over-refunding / over-reimbursing can only be flagged globally (IA-13), not prevented. |
+| L-3 | **Refunds are not linked** to a specific expense, so over-refunding can only be flagged globally (IA-13). Reimbursements *are* linked (Option C). |
+| L-3b | **One expense, one payer.** Multi-payer expenses cannot be reimbursed (the link needs one payer). |
 | L-4 | Nothing can become **approved** through the app until Phase 5, so a real deployment reads zero until then. Tests approve with a controlled database write; authorization was not weakened. |
 | L-5 | The settlement path is not guaranteed to use the minimum number of transfers. |
-| L-6 | The business-funded attribution (IA-5) is pro-rata by fair share; another policy (e.g. only to the payer) would give different founder-to-founder amounts. |
+| L-6 | Only **approved** expenses can be reimbursed, and nothing can be approved through the app until Phase 5 (L-4), so the reimbursement flow can only be exercised end-to-end with fixture approvals until then. |
 | L-7 | A settlement's `method` is free text (≤50 chars). There is no dedicated mark-as-settled workflow yet. |
 | L-8 | No "as of date" filter, caching, or per-period views (reports, Phase 7). |
 
@@ -104,7 +99,7 @@ No fake founder and no capital pool was introduced.
 
 | Topic | Decision |
 |---|---|
-| **Reimbursement** | Internally inconsistent before (§1). Now: external amount + founder-to-founder balance (IA-4, IA-5). No fake founder, no capital pool. Net position keeps its formula; the split into "between founders" and "external" is shown in the API and UI. |
+| **Reimbursement** | Option C (IA-4, IA-5b, IA-5c): linked to one approved expense, business-borne, founders share only the funded remainder, zero-sum without any attribution rule. No fake founder, no capital pool. |
 | **Refund** | Reviewed for double counting and distortion. The original expense is untouched; the refund has its own ledger effects; a refund received by a different founder correctly leaves that founder holding cash owed back (negative *paid* is legitimate there); an over-large refund is flagged, not clamped (IA-6, IA-13). |
 | **Contribution** | Kept separate (IA-7). Capital pool not modelled (L-1). |
 | **Loan** | Verified by tests to be absent from fair share, paid, net, and settlement. Repayment not modelled (L-2). |
@@ -118,43 +113,49 @@ No fake founder and no capital pool was introduced.
 For founder *f*, over official, valid transactions (IA-2, IA-12):
 
 ```
-expensePaid(f)     = Σ amount of business_expense  paidBy = f
-refundReceived(f)  = Σ amount of refund            paidBy = f
-reimbursed(f)      = Σ amount of reimbursement     paidBy = f
-paid(f)            = expensePaid − refundReceived − reimbursed                  # "Paid"
-fairShare(f)       = Σ allocated(f) over expense splits − Σ allocated(f) over refund splits
+for each valid approved business_expense E (amount X, payer P, stored allocations a_i):
+    R(E)          = Σ valid linked reimbursements (approved, same payer, in cap order)      # IA-4, IA-5c
+    founderFunded = X − R(E)
+    share_i       = a_i                         if R(E) = 0
+                  = allocate(founderFunded, weights = a_i)   (largest remainder; 0s if founderFunded = 0)
+    paid(P)      += X − R(E)         fairShare(i) += share_i         businessBorne += R(E)
 
-net(f)             = paid(f) − fairShare(f)                                     # INF-1 (includes any business-funded effect)
+refundReceived(f)  = Σ amount of refund paidBy = f                    fairShare(i) −= refund allocation(i)    paid(f) −= refund
+paid(f)            = Σ (X − R(E)) over f's expenses − refundReceived                  # "Paid"
+reimbursed(f)      = Σ valid reimbursements paid to f                                  # informational
 
-R                  = Σ_f reimbursed(f)                                          # EXTERNAL amount
-businessFundedShare(f) = allocate(R, weights = fairShare(f) if > 0)             # Σ = R exactly (IA-5)
-founderBalance(f)  = net(f) + businessFundedShare(f)                            # Σ_f = 0, always
-
+net(f)             = paid(f) − fairShare(f)                           # INF-1.   Σ_f net(f) = 0 EXACTLY, always
 settledPaid(f), settledReceived(f) = Σ settlements paid / received by f
-outstanding(f)     = founderBalance(f) + settledPaid(f) − settledReceived(f)    # signed; Σ_f = 0
+outstanding(f)     = net(f) + settledPaid(f) − settledReceived(f)     # signed; Σ_f = 0
 receivable = max(outstanding, 0)   payable = max(−outstanding, 0)
 action = receive | pay | settled          (from outstanding; INF-2)
-
 overSettled(f)     = amount by which settlements moved f past zero (IA-10), else 0
 contribution(f), loanOutstanding(f)  — separate metrics only (IA-7, IA-8)
 ```
 
-## 5. Reconciliation (returned with every result)
+Worked examples (₹; 3,000 expense paid by A, equal split of A, B, C):
 
-Separates the two layers:
+| Case | Paid A/B/C | Fair share A/B/C | Net A/B/C | Recommendations |
+|---|---|---|---|---|
+| no reimbursement | 3,000 / 0 / 0 | 1,000 each | +2,000 / −1,000 / −1,000 | B→A 1,000, C→A 1,000 |
+| ₹1,000 reimbursed | 2,000 / 0 / 0 | 666.67 / 666.67 / 666.66 | +1,333.33 / −666.67 / −666.66 | B→A 666.67, C→A 666.66 |
+| fully reimbursed | 0 / 0 / 0 | 0 / 0 / 0 | 0 / 0 / 0 | none |
+| ₹1,000 + ₹500 | 1,500 / 0 / 0 | 500 each | +1,000 / −500 / −500 | B→A 500, C→A 500 |
+
+## 5. Reconciliation (returned with every result)
 
 | Field | Meaning |
 |---|---|
-| `status` | `PASS` — balances reconcile, no external amount, no warnings · `PASS_WITH_EXTERNAL` — balances reconcile; an external amount exists and is explained · `REVIEW` — arithmetic reconciles but warnings need attention · `FAIL` — an internal check failed (a bug) |
-| `explanation` | Plain-language reason for the status |
-| `checks[]` | `FOUNDER_BALANCES_ZERO_SUM`, `SETTLEMENTS_ZERO_SUM`, `RECEIVABLE_EQUALS_PAYABLE`, `EXTERNAL_RECONCILES`, `FAIR_SHARE_RECONCILES`, `PAID_RECONCILES`, `RECOMMENDATIONS_CLEAR_BALANCES`, each with `ok` and `detail` |
-| `sumGrossNetPositionMinor` | Σ (paid − fair share) = **−externalMinor** |
-| `externalMinor` | Business-funded amount: never owed to or by a founder; never in a recommendation |
-| `founderBalanceSumMinor` | Always 0 |
-| `totalReceivableMinor` / `totalPayableMinor` | Founder-to-founder, after settlements; equal when reconciled |
+| `status` | `PASS` — balances reconcile, no warnings · `REVIEW` — arithmetic reconciles but warnings need attention · `FAIL` — an internal check failed (a bug) |
+| `explanation` | Plain-language reason for the status (names the business-borne amount when there is one) |
+| `checks[]` | `NET_POSITIONS_ZERO_SUM`, `SETTLEMENTS_ZERO_SUM`, `RECEIVABLE_EQUALS_PAYABLE`, `FAIR_SHARE_RECONCILES`, `PAID_RECONCILES`, `REIMBURSEMENTS_WITHIN_EXPENSES`, `RECOMMENDATIONS_CLEAR_BALANCES`, each with `ok` and `detail` |
+| `sumGrossNetPositionMinor` | Σ (paid − fair share) — **always 0** |
+| `businessBorneMinor` | Σ of valid reimbursements: borne by the business, informational, never owed by or to a founder |
+| `totalPaidMinor`, `totalFairShareMinor` | Both equal expenses − business-borne − refunds |
+| `totalReceivableMinor` / `totalPayableMinor` | After settlements; equal when reconciled |
 | `recommendedTotalMinor`, `unresolved*` | Recommendations total; any remainder (0 in practice) |
 
-**Invariant A (strengthened, not weakened).** Founder-to-founder balances sum to exactly 0 in *every* scenario, reimbursements included. The only quantity that is not zero-sum is the explicitly reported external amount: Σ(paid − fair share) = −external.
+**Invariant A.** Net positions sum to exactly 0 in *every* scenario, reimbursements included (the earlier "= −external" weakening is gone).
 
 ## 6. Settlement algorithm (IA-17)
 
@@ -182,14 +183,16 @@ Tested properties: no money created or lost; no transfer exceeds what the payer 
 | `GET /api/founders/financial-positions` | `{calculatedAt, currency, positions[], reconciliation, included, excluded, warnings}` |
 | `GET /api/founders/:id/financial-position` | `{calculatedAt, currency, position, history[], reconciliation, warnings}` |
 | `GET /api/settlements/recommendations` | `{calculatedAt, currency, recommendations[{payer, receiver, amountMinor}], unresolvedPayableMinor, unresolvedReceivableMinor, reconciliation}` |
-| `GET /api/settlements/summary` | `{calculatedAt, currency, totals{settledMinor, outstandingPayableMinor, outstandingReceivableMinor, recommendedTransfersMinor, externalMinor}, counts, history[], reconciliation, warnings}` |
+| `GET /api/settlements/summary` | `{calculatedAt, currency, totals{settledMinor, outstandingPayableMinor, outstandingReceivableMinor, recommendedTransfersMinor, businessBorneMinor}, counts, history[], reconciliation, warnings}` |
 
-`position` adds, in this revision: `businessFundedShareMinor`, `founderBalanceMinor`, `overSettledMinor`. `warnings[]` entries: `{code, level: 'warning' | 'info', transactionId | null, founderId?, message}`. The reconciliation field `unallocatedMinor` was replaced by `externalMinor` and `sumGrossNetPositionMinor`.
+`position` includes `expensePaidMinor`, `refundReceivedMinor`, `reimbursedMinor`, `paidMinor`, `fairShareMinor`, `grossNetPositionMinor`, `overSettledMinor`, `outstanding*`. `warnings[]` entries: `{code, level: 'warning' | 'info', transactionId | null, founderId?, message}`. Removed by Option C: `businessFundedShareMinor`, `founderBalanceMinor`, `externalMinor`, `founderBalanceSumMinor`.
+
+Reimbursement endpoints live in [PHASE-2.md](PHASE-2.md) (amended): `reimbursesTransactionId` on create/edit, `GET /api/transactions/reimbursable-expenses?paidByFounderId=…[&forReimbursementId=…]` (picker), expense detail returns `reimbursedMinor`, `remainingReimbursableMinor` and `linkedReimbursements[]`. Errors: `REIMBURSEMENT_EXCEEDS_EXPENSE` (400, with `remainingMinor`), `HAS_LINKED_REIMBURSEMENTS` (409).
 
 ## 9. Test strategy
 
-* **Unit** (`calculationEngine`, `settlementAlgorithm`, `accountingReview`): every transaction type, hand-computed expectations, rounding, validity, over-settlement, external amount, diagnostics.
-* **Randomized invariants** (`calcInvariants`): hundreds of random scenarios over 4 founders and every type; founder-to-founder zero-sum with and without reimbursements; external = Σ reimbursed; no money created/lost; excluded statuses change nothing; applying recommendations settles fully.
-* **API** (`financials`, real MongoDB): authentication, authorization, invalid ids, no data, multiple types, edit/void/settlement reflected immediately, external amount, over-settlement, "Other".
-* **Client**: displays server values verbatim (deliberately inconsistent data), names the external amount and every reconciliation status in words, no arithmetic on money values in the financial views.
-* **Browser**: end-to-end against Docker with hand-computed expectations.
+* **Unit** (`calculationEngine`, `settlementAlgorithm`, `accountingReview`): every transaction type, hand-computed expectations, rounding, validity, over-settlement, business-borne amount, diagnostics.
+* **Randomized invariants** (`calcInvariants`): hundreds of random scenarios over 4 founders and every type (reimbursements linked to earlier expenses, some over the cap); Σ net = 0 with and without reimbursements; business-borne = Σ valid reimbursements; no money created/lost; excluded statuses change nothing; applying recommendations settles fully.
+* **API** (`financials`, `reimbursements`, real MongoDB): authentication, authorization, invalid ids, no data, multiple types, edit/void/settlement reflected immediately, the 25 Option C reimbursement cases (link rules, cap, concurrency, void guard, picker), over-settlement, "Other".
+* **Client**: displays server values verbatim (deliberately inconsistent data), names the business-borne amount and every reconciliation status in words, expense picker, server error display, no arithmetic on money values in the financial views.
+* **Browser**: `tests/browser/optionc-browser.mjs` end-to-end against Docker at desktop / tablet / mobile with hand-computed expectations and API-equals-display checks. `tests/docker-reimbursement-e2e.sh` runs the same business flow over HTTP.

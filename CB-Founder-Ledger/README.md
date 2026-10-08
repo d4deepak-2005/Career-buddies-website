@@ -1,6 +1,6 @@
 # CareerBuddies Founder Finance
 
-Private, responsive web app for the three CareerBuddies founders (investment, expenses, settlements). MongoDB is the source of truth; all financial logic will live in the backend. **Current state: Phase 3 — Calculation engine** on top of Phase 1 (foundation) and Phase 2 (transactions, splits, receipts). The server calculates each founder's paid, fair share, net position, outstanding balance and a settlement recommendation from **approved** transactions only; the client just displays them. **Not built:** dashboard KPIs/charts (Phase 4), the approval workflow and approve/reject UI (Phase 5), recurring (6), reports (7), hardening (8), launch (9). Until Phase 5, nothing can become *approved* through the app, so positions read zero in a real deployment; tests approve records with a controlled database write. See [`docs/PHASE-3-CALCULATION-SPEC.md`](docs/PHASE-3-CALCULATION-SPEC.md) (what is from the PDF vs. assumed), [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md), [`docs/PHASE-1.md`](docs/PHASE-1.md), [`docs/PHASE-2.md`](docs/PHASE-2.md).
+Private, responsive web app for the three CareerBuddies founders (investment, expenses, settlements). MongoDB is the source of truth; all financial logic will live in the backend. **Current state: Phase 3 — Calculation engine, with Option C expense-linked reimbursements** on top of Phase 1 (foundation) and Phase 2 (transactions, splits, receipts). The server calculates each founder's paid, fair share, net position, outstanding balance and a settlement recommendation from **approved** transactions only; the client just displays them. **Not built:** dashboard KPIs/charts (Phase 4), the approval workflow and approve/reject UI (Phase 5), recurring (6), reports (7), hardening (8), launch (9). Until Phase 5, nothing can become *approved* through the app, so positions read zero in a real deployment; tests approve records with a controlled database write. A reimbursement must name the one approved expense it pays back; the reimbursed part is borne by the business and founders share only the rest (label: *implementation assumption — product-owner decision*; the PDF is silent). Net position stays `Paid − Fair share` (*inferred from the Product Plan example*). Known limits (*Phase 3 limitation*): approval only via fixtures until Phase 5, one payer per expense, no loan repayment/refund linking/capital pool. See [`docs/PHASE-3-CALCULATION-SPEC.md`](docs/PHASE-3-CALCULATION-SPEC.md) (what is from the PDF vs. assumed), [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md), [`docs/PHASE-1.md`](docs/PHASE-1.md), [`docs/PHASE-2.md`](docs/PHASE-2.md).
 
 Stack: React 19 · TypeScript (strict) · Vite · Tailwind CSS 3 · Lucide — Node 22 · Express 4 · Mongoose 8 · Zod · MongoDB 7.
 
@@ -55,8 +55,21 @@ Server tests need a MongoDB (they use the database `cb_founder_ledger_test` and 
 ```bash
 npm test                      # server + client
 npm --prefix server test      # API, auth, RBAC, validation, config, DB, rate-limit, transactions, splits, receipts, calculation engine, settlement algorithm, invariants, financial API
+npm --prefix server run reconcile:reimbursements   # read-only: reports drift between expense reservations and linked reimbursements (add :prod for the built server)
 npm --prefix client test      # routing, login flow, API client, transactions list/form/detail, settings, founders / ledger / settlements views
 ```
+
+### Docker and browser verification (Option C)
+
+```bash
+# with the Docker stack up and the admin seeded (section 2):
+export SMOKE_ADMIN_EMAIL=<seed email> SMOKE_ADMIN_PASSWORD=<seed password>
+npm run docker:smoke                        # 61 HTTP checks incl. reimbursement validation
+tests/docker-reimbursement-e2e.sh           # approved-path flow: reimburse, over-reimburse, void guard, restore (approves via a direct DB write — Phase 5 owns approval)
+PLAYWRIGHT_MODULE=<path to playwright/index.mjs> node tests/browser/optionc-browser.mjs   # desktop + tablet + mobile browser flow
+```
+
+These create `[...]`-tagged throwaway records; run them against a disposable stack and finish with `docker compose ... down -v`.
 
 ## 4. Typecheck
 
