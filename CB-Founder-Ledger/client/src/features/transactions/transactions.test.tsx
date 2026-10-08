@@ -141,6 +141,50 @@ describe('add transaction form', () => {
     expect(typeof (posted as unknown as { amountMinor: unknown }).amountMinor).toBe('number');
   });
 
+  describe('reimbursement expense picker (Option C)', () => {
+    const expenses = [
+      { id: 'e1', txnNumber: 'TXN-000001', description: 'Cloud hosting', transactionDate: '2026-04-15', amountMinor: 300_000, reimbursedMinor: 0, remainingMinor: 300_000 },
+      { id: 'e2', txnNumber: 'TXN-000002', description: 'Domains', transactionDate: '2026-04-20', amountMinor: 50_000, reimbursedMinor: 20_000, remainingMinor: 30_000 },
+    ];
+    it('a reimbursement requires choosing the expense; the picker lists only that founder\'s reimbursable expenses', async () => {
+      const calls = mockFetch({ ...me(founderUser), 'GET /transactions/reimbursable-expenses': { status: 200, body: { expenses } } });
+      renderApp('/transactions/new');
+      await userEvent.click(await screen.findByRole('radio', { name: 'Reimbursement' }));
+      expect(screen.getByRole('radiogroup', { name: 'Expense being reimbursed' })).toBeInTheDocument();
+      expect(await screen.findByRole('radio', { name: /TXN-000001.*Cloud hosting/ })).toBeInTheDocument();
+      expect(screen.getByRole('radio', { name: /TXN-000002.*Up to .*300\.00/ })).toBeInTheDocument();
+      expect(calls.some((c) => c.startsWith('GET /transactions/reimbursable-expenses?paidByFounderId=f1'))).toBe(true);
+      await userEvent.type(screen.getByLabelText(/Amount/), '100');
+      await userEvent.type(screen.getByLabelText('Description'), 'Paid back');
+      await userEvent.click(screen.getByRole('button', { name: 'Submit for approval' }));
+      expect(await screen.findByText('Choose the expense this reimburses')).toBeInTheDocument();
+      expect(calls.filter((c) => c === 'POST /transactions')).toEqual([]);
+    });
+    it('sends only the link id (no financial values from the client) and shows server errors such as over-reimbursement', async () => {
+      let posted: Record<string, unknown> | null = null;
+      mockFetch({
+        ...me(founderUser),
+        'GET /transactions/reimbursable-expenses': { status: 200, body: { expenses } },
+        'POST /transactions': (_u, init) => { posted = body(init); return { status: 400, body: { error: { code: 'REIMBURSEMENT_EXCEEDS_EXPENSE', message: 'This reimbursement would take the total reimbursed above the expense amount', details: [{ path: 'amountMinor', code: 'REIMBURSEMENT_EXCEEDS_EXPENSE', message: 'This reimbursement would take the total reimbursed above the expense amount', remainingMinor: 100_000 }] } } }; },
+      });
+      renderApp('/transactions/new');
+      await userEvent.click(await screen.findByRole('radio', { name: 'Reimbursement' }));
+      await userEvent.click(await screen.findByRole('radio', { name: /TXN-000001/ }));
+      await userEvent.type(screen.getByLabelText(/Amount/), '2500');
+      await userEvent.type(screen.getByLabelText('Description'), 'Paid back');
+      await userEvent.click(screen.getByRole('button', { name: 'Submit for approval' }));
+      expect((await screen.findAllByText(/above the expense amount/)).length).toBeGreaterThan(0);
+      expect(posted).toMatchObject({ type: 'reimbursement', amountMinor: 250_000, reimbursesTransactionId: 'e1', paidByFounderId: 'f1' });
+      expect(Object.keys(posted as unknown as object)).not.toEqual(expect.arrayContaining(['fairShareMinor', 'reimbursedMinor']));
+    });
+    it('no approved expenses left -> explains instead of showing an empty list', async () => {
+      mockFetch({ ...me(founderUser), 'GET /transactions/reimbursable-expenses': { status: 200, body: { expenses: [] } } });
+      renderApp('/transactions/new');
+      await userEvent.click(await screen.findByRole('radio', { name: 'Reimbursement' }));
+      expect(await screen.findByText(/no approved expenses left to reimburse/)).toBeInTheDocument();
+    });
+  });
+
   it('shows server-side field errors returned by the API', async () => {
     mockFetch({
       ...me(founderUser),
@@ -160,6 +204,29 @@ describe('transaction detail', () => {
   const detail = (t: Transaction, user: typeof founderUser | typeof adminUser, extra: Record<string, unknown> = {}) => mockFetch({
     ...me(user), 'GET /transactions/t1': { status: 200, body: { transaction: t, receipts: [{ id: 'r1', transactionId: 't1', fileName: 'scan.png', mimeType: 'image/png', sizeBytes: 2048, sha256: 'x', uploadedAt: '2026-04-15T10:00:00Z', uploadedBy: { id: '2', name: 'Founder One' } }] } },
     'GET /transactions/t1/history': { status: 200, body: { history: [{ id: 'h1', version: 1, action: 'created', at: '2026-04-15T10:00:00Z', reason: null, actor: { id: '2', name: 'Founder One' } }] } }, ...extra,
+  });
+
+  it('an expense shows what is reimbursed and links to its reimbursements; a reimbursement links back to its expense', async () => {
+    mockFetch({
+      ...me(adminUser),
+      'GET /transactions/t1': { status: 200, body: { transaction: tx({ status: 'approved', reimbursedMinor: 1_000_000, remainingReimbursableMinor: 2_000_000 }), receipts: [],
+        linkedReimbursements: [{ id: 'r9', txnNumber: 'TXN-000009', amountMinor: 1_000_000, status: 'approved', transactionDate: '2026-05-03' }] } },
+      'GET /transactions/t1/history': { status: 200, body: { history: [] } },
+      'GET /transactions/r9': { status: 200, body: { transaction: tx({ id: 'r9', txnNumber: 'TXN-000009', type: 'reimbursement', amountMinor: 1_000_000, split: null, description: 'Paid back', reimbursesTransactionId: 't1', reimbursesTransaction: { id: 't1', txnNumber: 'TXN-000001', description: 'Cloud hosting', amountMinor: 3_000_000 } }), receipts: [], linkedReimbursements: [] } },
+      'GET /transactions/r9/history': { status: 200, body: { history: [] } },
+    });
+    renderApp('/transactions/t1');
+    const summary = await screen.findByTestId('reimbursed-summary');
+    expect(summary).toHaveTextContent(/10,000\.00 reimbursed.*20,000\.00 still reimbursable.*founders share .*20,000\.00/);
+    expect(screen.getByRole('link', { name: 'TXN-000009' })).toHaveAttribute('href', '/transactions/r9');
+  });
+  it('a blocked expense void shows the server explanation', async () => {
+    detail(tx({ status: 'approved' }), adminUser, { 'POST /transactions/t1/void': { status: 409, body: { error: { code: 'HAS_LINKED_REIMBURSEMENTS', message: 'This expense has active reimbursements. Void the linked reimbursement(s) first, then void the expense.', details: [] } } } });
+    renderApp('/transactions/t1');
+    await userEvent.click(await screen.findByRole('button', { name: 'Void transaction' }));
+    await userEvent.type(screen.getByLabelText('Reason (required)'), 'entered twice');
+    await userEvent.click(screen.getAllByRole('button', { name: 'Void transaction' }).at(-1)!);
+    expect(await screen.findByText(/Void the linked reimbursement\(s\) first/)).toBeInTheDocument();
   });
 
   it('shows split responsibility, authorised receipt links (no public URLs) and history', async () => {

@@ -8,7 +8,7 @@ import type { AppConfig, Category, Founder } from '../lib/types';
 type Handler = (url: string, init?: RequestInit) => { status: number; body?: unknown };
 
 /** Stub global fetch with a route table keyed by "METHOD /path". */
-const need = (category: string, paidBy: string, counterparty: string, split: string, notes: string, method = 'forbidden') => ({ category, paidBy, counterparty, split, notes, method });
+const need = (category: string, paidBy: string, counterparty: string, split: string, notes: string, method = 'forbidden', linkedExpense = 'forbidden') => ({ category, paidBy, counterparty, split, notes, method, linkedExpense });
 export const configFixture = {
   currency: { code: 'INR', minorUnits: 2 },
   receipts: { maxBytes: 5 * 1024 * 1024, allowedExtensions: ['pdf', 'jpg', 'jpeg', 'png'], maxPerTransaction: 10 },
@@ -16,7 +16,7 @@ export const configFixture = {
     { value: 'business_expense', label: 'Business Expense', rules: need('required', 'required', 'forbidden', 'required', 'optional') },
     { value: 'founder_contribution', label: 'Founder Contribution', rules: need('optional', 'required', 'forbidden', 'forbidden', 'optional') },
     { value: 'founder_loan', label: 'Founder Loan', rules: need('optional', 'required', 'forbidden', 'forbidden', 'optional') },
-    { value: 'reimbursement', label: 'Reimbursement', rules: need('optional', 'required', 'forbidden', 'forbidden', 'optional') },
+    { value: 'reimbursement', label: 'Reimbursement', rules: need('optional', 'required', 'forbidden', 'forbidden', 'optional', 'forbidden', 'required') },
     { value: 'settlement', label: 'Settlement', rules: need('optional', 'required', 'required', 'forbidden', 'optional', 'optional') },
     { value: 'refund', label: 'Refund', rules: need('optional', 'required', 'forbidden', 'required', 'optional') },
     { value: 'other', label: 'Other', rules: need('optional', 'optional', 'forbidden', 'optional', 'required') },

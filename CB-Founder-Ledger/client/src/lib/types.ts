@@ -3,7 +3,7 @@ export type TransactionStatus = 'draft' | 'pending_approval' | 'approved' | 'rej
 export type SplitMethod = 'equal' | 'percentage' | 'exact' | 'shares' | 'custom';
 export type Need = 'required' | 'optional' | 'forbidden';
 
-export interface TypeRules { category: Need; paidBy: Need; counterparty: Need; split: Need; notes: Need; method: Need }
+export interface TypeRules { category: Need; paidBy: Need; counterparty: Need; split: Need; notes: Need; method: Need; linkedExpense?: Need }
 
 export interface AppConfig {
   currency: { code: string; minorUnits: number };
@@ -23,10 +23,16 @@ export interface Split { method: SplitMethod; entries: SplitEntry[] }
 export interface Transaction {
   id: string; txnNumber: string; type: TransactionType; amountMinor: number; description: string; notes: string | null; method: string | null;
   category: Named | null; paidBy: Named | null; counterparty: Named | null; transactionDate: string; status: TransactionStatus;
-  split: Split | null; receiptCount: number; void: { reason: string; voidedAt: string; voidedBy: Named | null } | null;
+  split: Split | null; receiptCount: number;
+  /** Option C. A reimbursement points at the expense it reimburses; an expense reports how much is already reimbursed. */
+  reimbursesTransactionId?: string | null;
+  reimbursesTransaction?: { id: string; txnNumber: string; description: string; amountMinor: number } | null;
+  reimbursedMinor?: number | null; remainingReimbursableMinor?: number | null;
+  void: { reason: string; voidedAt: string; voidedBy: Named | null } | null;
   version: number; createdBy: Named | null; updatedBy: Named | null; createdAt: string; updatedAt: string;
 }
 
+export interface ReimbursableExpense { id: string; txnNumber: string; description: string; transactionDate: string; amountMinor: number; reimbursedMinor: number; remainingMinor: number }
 export interface Receipt { id: string; transactionId: string; fileName: string; mimeType: string; sizeBytes: number; sha256: string; uploadedAt: string; uploadedBy: Named }
 export interface HistoryItem { id: string; version: number; action: string; at: string; reason: string | null; actor: Named }
 export interface TransactionList { items: Transaction[]; page: number; pageSize: number; total: number }
@@ -37,15 +43,15 @@ export interface FounderPosition {
   founderId: string; founderName: string; active: boolean;
   expensePaidMinor: number; refundReceivedMinor: number; reimbursedMinor: number; paidMinor: number;
   contributionMinor: number; loanOutstandingMinor: number; fairShareMinor: number; grossNetPositionMinor: number;
-  businessFundedShareMinor: number; founderBalanceMinor: number; overSettledMinor: number;
+  overSettledMinor: number;
   settledPaidMinor: number; settledReceivedMinor: number; outstandingMinor: number;
   outstandingReceivableMinor: number; outstandingPayableMinor: number;
   action: PositionAction; settlementStatus: 'settled' | 'partially_settled' | 'open';
 }
-export type ReconciliationStatus = 'PASS' | 'PASS_WITH_EXTERNAL' | 'REVIEW' | 'FAIL';
+export type ReconciliationStatus = 'PASS' | 'REVIEW' | 'FAIL';
 export interface Reconciliation {
   status: ReconciliationStatus; explanation: string; checks: Array<{ code: string; ok: boolean; detail: string }>;
-  totalPaidMinor: number; totalFairShareMinor: number; sumGrossNetPositionMinor: number; externalMinor: number; founderBalanceSumMinor: number;
+  totalPaidMinor: number; totalFairShareMinor: number; sumGrossNetPositionMinor: number; businessBorneMinor: number;
   totalReceivableMinor: number; totalPayableMinor: number; recommendedTotalMinor: number; unresolvedPayableMinor: number; unresolvedReceivableMinor: number; isBalanced: boolean;
 }
 export interface CalcWarning { code: string; level: 'warning' | 'info'; transactionId: string | null; founderId?: string | null; message: string }
@@ -64,7 +70,7 @@ export interface RecommendationsResponse {
 }
 export interface SettlementSummaryResponse {
   calculatedAt: string;
-  totals: { settledMinor: number; outstandingPayableMinor: number; outstandingReceivableMinor: number; recommendedTransfersMinor: number; externalMinor: number };
+  totals: { settledMinor: number; outstandingPayableMinor: number; outstandingReceivableMinor: number; recommendedTransfersMinor: number; businessBorneMinor: number };
   counts: { official: number; awaitingApproval: number; voidedOrRejected: number; recommendedTransfers: number };
   history: Array<{ id: string; txnNumber: string; transactionDate: string; status: TransactionStatus; payer: Named | null; receiver: Named | null; amountMinor: number; method: string | null; counted: boolean }>;
   reconciliation: Reconciliation; warnings: CalcWarning[];

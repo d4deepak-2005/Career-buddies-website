@@ -23,7 +23,7 @@ export function TransactionDetailPage() {
   const { user } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
-  const detail = useResource<{ transaction: Transaction; receipts: Receipt[] }>(`/transactions/${id}`);
+  const detail = useResource<{ transaction: Transaction; receipts: Receipt[]; linkedReimbursements?: Array<{ id: string; txnNumber: string; amountMinor: number; status: string; transactionDate: string }> }>(`/transactions/${id}`);
   const history = useResource<{ history: HistoryItem[] }>(`/transactions/${id}/history`);
   const [voiding, setVoiding] = useState(false);
   const [reason, setReason] = useState('');
@@ -37,7 +37,7 @@ export function TransactionDetailPage() {
   if (detail.error) return <div className="space-y-4"><ErrorBox error={detail.error.status === 404 ? 'Transaction not found.' : detail.error} onRetry={detail.reload} /><Link to="/transactions" className="btn-ghost">Back to transactions</Link></div>;
   if (!detail.data) return null;
 
-  const { transaction: t, receipts } = detail.data;
+  const { transaction: t, receipts, linkedReimbursements = [] } = detail.data;
   const money = (n: number) => formatMinor(n, cfg.currency);
   const typeLabel = cfg.transactionTypes.find((x) => x.value === t.type)?.label ?? t.type;
   const isOwner = t.createdBy?.id === user?.id;
@@ -106,6 +106,13 @@ export function TransactionDetailPage() {
           <Row label="Category">{t.category?.name ?? '—'}</Row>
           <Row label="Paid by">{t.paidBy?.name ?? '—'}</Row>
           {t.counterparty && <Row label="Received by">{t.counterparty.name}</Row>}
+          {t.reimbursesTransaction && <Row label="Reimburses"><Link className="font-semibold text-cb-blue underline" to={`/transactions/${t.reimbursesTransaction.id}`}>{t.reimbursesTransaction.txnNumber} · {t.reimbursesTransaction.description}</Link> ({money(t.reimbursesTransaction.amountMinor)})</Row>}
+          {t.type === 'business_expense' && (t.reimbursedMinor ?? 0) > 0 && (
+            <Row label="Reimbursed by the business">
+              <span data-testid="reimbursed-summary">{money(t.reimbursedMinor ?? 0)} reimbursed · {money(t.remainingReimbursableMinor ?? 0)} still reimbursable · founders share {money(t.amountMinor - (t.reimbursedMinor ?? 0))}</span>
+              {linkedReimbursements.length > 0 && <ul className="mt-1 list-disc pl-5 text-xs">{linkedReimbursements.map((r) => <li key={r.id}><Link className="text-cb-blue underline" to={`/transactions/${r.id}`}>{r.txnNumber}</Link> · {money(r.amountMinor)} · {r.status.replace('_', ' ')}</li>)}</ul>}
+            </Row>
+          )}
           {t.method && <Row label="Payment method">{t.method}</Row>}
           <Row label="Notes">{t.notes ?? '—'}</Row>
           <Row label="Created">{t.createdBy?.name} · {fmtTime(t.createdAt)}</Row>

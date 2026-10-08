@@ -37,7 +37,7 @@ export function FoundersPage() {
               <Stat label="Fair share" value={m(p.fairShareMinor)} />
               <Stat label="Net position" value={formatSignedMinor(p.grossNetPositionMinor, currency)} tone={p.grossNetPositionMinor > 0 ? 'receive' : p.grossNetPositionMinor < 0 ? 'pay' : undefined} hint="Paid − fair share" />
               <Stat label={p.action === 'pay' ? 'Still to pay' : p.action === 'receive' ? 'Still to receive' : 'Outstanding'} value={m(Math.abs(p.outstandingMinor))} tone={p.action === 'receive' ? 'receive' : p.action === 'pay' ? 'pay' : undefined} hint="Between founders, after settlements" />
-              {p.businessFundedShareMinor > 0 && <Stat label="Business-funded share" value={m(p.businessFundedShareMinor)} hint="External: paid from business funds, not owed to a founder" />}
+              {p.reimbursedMinor > 0 && <Stat label="Reimbursed by business" value={m(p.reimbursedMinor)} hint="Part of your expenses the business paid back; not shared between founders" />}
               <Stat label="Contributed" value={m(p.contributionMinor)} />
               <Stat label="Loan outstanding" value={m(p.loanOutstandingMinor)} />
             </dl>

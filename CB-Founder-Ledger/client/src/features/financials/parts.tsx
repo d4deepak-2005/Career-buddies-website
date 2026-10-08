@@ -28,21 +28,20 @@ export function Stat({ label, value, tone, hint }: { label: string; value: strin
 
 const STATUS_TEXT: Record<Reconciliation['status'], string> = {
   PASS: 'Balanced',
-  PASS_WITH_EXTERNAL: 'Balanced, with an external amount',
   REVIEW: 'Needs review',
   FAIL: 'Error — figures may be wrong',
 };
 
-/** States the reconciliation result in words. The external (business-funded) amount is named, not folded into founders' balances. */
+/** States the reconciliation result in words. The reimbursed (business-borne) amount is named, not folded into founders' balances. */
 export function ReconciliationNote({ reconciliation, currency }: { reconciliation: Reconciliation; currency: CurrencyConfig }) {
   const r = reconciliation;
-  const Icon = r.status === 'PASS' || r.status === 'PASS_WITH_EXTERNAL' ? CheckCircle2 : AlertTriangle;
+  const Icon = r.status === 'PASS' ? CheckCircle2 : AlertTriangle;
   return (
     <div className="rounded-xl border border-surface-line bg-white px-4 py-3 text-sm" aria-label="Reconciliation">
       <p className="flex items-center gap-2 font-semibold text-cb-navy"><Icon className="h-4 w-4 shrink-0" aria-hidden />Reconciliation: {STATUS_TEXT[r.status]}</p>
-      {r.externalMinor > 0 && (
+      {r.businessBorneMinor > 0 && (
         <p className="mt-1 text-ink-muted">
-          <strong className="text-cb-navy">{formatMinor(r.externalMinor, currency)} external</strong> — paid from business funds (reimbursements). It is shown separately and is never owed to, or by, a founder.
+          <strong className="text-cb-navy">{formatMinor(r.businessBorneMinor, currency)} reimbursed by the business</strong> — borne by the business, not shared between founders. Founders share only the founder-funded part of each expense.
         </p>
       )}
       {r.status === 'FAIL' && <p className="mt-1 text-danger">{r.explanation}</p>}

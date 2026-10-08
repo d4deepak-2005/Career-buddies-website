@@ -5,8 +5,8 @@ import { useAuth } from '../../auth/AuthContext';
 import { ErrorBox, FieldError, Label, detailsByPath } from '../../components/ui';
 import { ApiError, api } from '../../lib/api';
 import { useAppConfig } from '../../lib/AppConfigContext';
-import { minorToInput, parseMajorToMinor } from '../../lib/money';
-import type { Category, Founder, Transaction, TransactionType } from '../../lib/types';
+import { formatMinor, minorToInput, parseMajorToMinor } from '../../lib/money';
+import type { Category, Founder, ReimbursableExpense, Transaction, TransactionType } from '../../lib/types';
 import { useResource } from '../../lib/useResource';
 import { SplitEditor, buildSplitPayload, emptySplit, type PreviewState, type SplitFormState } from './SplitEditor';
 
@@ -25,6 +25,34 @@ function FounderPicker({ id, label, value, onChange, founders, allowNone, error 
               className={`flex min-h-11 items-center gap-2 rounded-xl border px-3 text-sm font-semibold transition ${on ? 'border-cb-navy bg-cb-navy text-white shadow-card' : 'border-surface-line bg-white text-cb-navy hover:border-cb-blue'}`}>
               <span className={`flex h-6 w-6 items-center justify-center rounded-full text-xs ${on ? 'bg-white/20' : 'bg-cb-blue/10 text-cb-blue'}`}>{f.name.slice(0, 1).toUpperCase()}</span>
               {f.name}{on && <Check className="h-4 w-4" aria-hidden />}
+            </button>
+          );
+        })}
+      </div>
+      <FieldError message={error} />
+    </div>
+  );
+}
+
+/** Option C: choose the approved expense this reimbursement pays back. The server decides what is reimbursable and how much. */
+function ExpensePicker({ paidBy, selected, onSelect, forReimbursementId, error, currency }: { paidBy: string; selected: string; onSelect: (id: string) => void; forReimbursementId?: string | undefined; error?: string | undefined; currency: { code: string; minorUnits: number } }) {
+  const qs = paidBy ? `?paidByFounderId=${encodeURIComponent(paidBy)}${forReimbursementId ? `&forReimbursementId=${encodeURIComponent(forReimbursementId)}` : ''}` : '';
+  const res = useResource<{ expenses: ReimbursableExpense[] }>(paidBy ? `/transactions/reimbursable-expenses${qs}` : null);
+  return (
+    <div>
+      <Label htmlFor="expensePicker">Which expense is being reimbursed?</Label>
+      <div id="expensePicker" role="radiogroup" aria-label="Expense being reimbursed" className="space-y-2">
+        {!paidBy && <p className="rounded-xl bg-surface-alt px-4 py-3 text-sm text-ink-muted">Choose who is being reimbursed first. Only approved expenses paid by that founder can be reimbursed.</p>}
+        {paidBy && res.loading && <p role="status" className="text-sm text-ink-muted">Loading expenses…</p>}
+        {paidBy && res.error && <ErrorBox error={res.error} />}
+        {paidBy && res.data && res.data.expenses.length === 0 && <p className="rounded-xl bg-surface-alt px-4 py-3 text-sm text-ink-muted">This founder has no approved expenses left to reimburse.</p>}
+        {res.data?.expenses.map((x) => {
+          const on = selected === x.id;
+          return (
+            <button key={x.id} type="button" role="radio" aria-checked={on} onClick={() => onSelect(on ? '' : x.id)}
+              className={`flex min-h-11 w-full items-start justify-between gap-3 rounded-xl border px-4 py-3 text-left text-sm transition ${on ? 'border-cb-navy bg-cb-navy text-white shadow-card' : 'border-surface-line bg-white text-cb-navy hover:border-cb-blue'}`}>
+              <span className="min-w-0"><span className="block truncate font-semibold">{x.txnNumber} · {x.description}</span><span className={`block text-xs ${on ? 'text-white/80' : 'text-ink-muted'}`}>{x.transactionDate} · expense {formatMinor(x.amountMinor, currency)}</span></span>
+              <span className="shrink-0 text-right text-xs font-semibold">Up to {formatMinor(x.remainingMinor, currency)}{on && <Check className="ml-1 inline h-4 w-4" aria-hidden />}</span>
             </button>
           );
         })}
@@ -53,6 +81,7 @@ export function TransactionForm({ existing }: { existing?: Transaction }) {
   const [categoryId, setCategoryId] = useState(existing?.category?.id ?? '');
   const [paidBy, setPaidBy] = useState(existing?.paidBy?.id ?? '');
   const [counterparty, setCounterparty] = useState(existing?.counterparty?.id ?? '');
+  const [linkedExpenseId, setLinkedExpenseId] = useState(existing?.reimbursesTransactionId ?? '');
   const [useSplit, setUseSplit] = useState(!!existing?.split);
   const [split, setSplit] = useState<SplitFormState>({ method: 'equal', rows: {} });
   const [file, setFile] = useState<File | null>(null);
@@ -64,6 +93,7 @@ export function TransactionForm({ existing }: { existing?: Transaction }) {
   const initialised = useRef(false);
 
   const rules = cfg.transactionTypes.find((t) => t.value === type)!.rules;
+  const needsExpense = rules.linkedExpense === 'required' || type === 'reimbursement';
   const splitVisible = rules.split === 'required' || (rules.split === 'optional' && useSplit);
 
   // Initialise split rows + default paid-by once founders arrive.
@@ -112,6 +142,7 @@ export function TransactionForm({ existing }: { existing?: Transaction }) {
     category: rules.category === 'required' && !categoryId ? 'Choose a category' : undefined,
     paidBy: rules.paidBy === 'required' && !paidBy ? 'Choose who paid' : undefined,
     counterparty: rules.counterparty === 'required' && !counterparty ? 'Choose who received the money' : undefined,
+    expense: needsExpense && !linkedExpenseId ? 'Choose the expense this reimburses' : undefined,
     notes: rules.notes === 'required' && !notes.trim() ? 'Notes are required for this type' : undefined,
   };
   const show = (k: keyof typeof local, serverKey: string) => (touched ? local[k] : undefined) ?? serverErrors[serverKey];
@@ -123,7 +154,7 @@ export function TransactionForm({ existing }: { existing?: Transaction }) {
     setError(null);
     if (hasLocalError || amountMinor === null || !built && splitVisible) return;
     const content: Record<string, unknown> = { type, amountMinor, transactionDate: date, description: description.trim() };
-    const optional = { notes: notes.trim() || undefined, method: rules.method === 'forbidden' ? undefined : method.trim() || undefined, categoryId: categoryId || undefined, paidByFounderId: paidBy || undefined, counterpartyFounderId: rules.counterparty === 'forbidden' ? undefined : counterparty || undefined, split: splitVisible && built && 'payload' in built ? built.payload : undefined };
+    const optional = { notes: notes.trim() || undefined, method: rules.method === 'forbidden' ? undefined : method.trim() || undefined, categoryId: categoryId || undefined, paidByFounderId: paidBy || undefined, counterpartyFounderId: rules.counterparty === 'forbidden' ? undefined : counterparty || undefined, split: splitVisible && built && 'payload' in built ? built.payload : undefined, reimbursesTransactionId: needsExpense ? linkedExpenseId || undefined : undefined };
     setBusy(true);
     try {
       let saved: Transaction;
@@ -229,7 +260,8 @@ export function TransactionForm({ existing }: { existing?: Transaction }) {
           </div>
         )}
 
-        <FounderPicker id="paidBy" label={type === 'refund' ? 'Which founder received the refund?' : type === 'settlement' ? 'Who paid?' : type === 'reimbursement' ? 'Who is being reimbursed?' : type === 'founder_contribution' || type === 'founder_loan' ? 'Which founder put the money in?' : 'Paid by'} value={paidBy} onChange={setPaidBy} founders={founders} allowNone={rules.paidBy !== 'required'} error={show('paidBy', 'paidByFounderId')} />
+        <FounderPicker id="paidBy" label={type === 'refund' ? 'Which founder received the refund?' : type === 'settlement' ? 'Who paid?' : type === 'reimbursement' ? 'Who is being reimbursed?' : type === 'founder_contribution' || type === 'founder_loan' ? 'Which founder put the money in?' : 'Paid by'} value={paidBy} onChange={(v) => { setPaidBy(v); setLinkedExpenseId(''); }} founders={founders} allowNone={rules.paidBy !== 'required'} error={show('paidBy', 'paidByFounderId')} />
+        {needsExpense && <ExpensePicker paidBy={paidBy} selected={linkedExpenseId} onSelect={setLinkedExpenseId} forReimbursementId={existing?.id} currency={cfg.currency} error={show('expense', 'reimbursesTransactionId')} />}
         {rules.counterparty !== 'forbidden' && <FounderPicker id="counterparty" label="Who received the money?" value={counterparty} onChange={setCounterparty} founders={founders.filter((f) => f.id !== paidBy)} allowNone={rules.counterparty !== 'required'} error={show('counterparty', 'counterpartyFounderId')} />}
       </section>
 

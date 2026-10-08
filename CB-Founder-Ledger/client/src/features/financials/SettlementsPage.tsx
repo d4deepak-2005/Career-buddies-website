@@ -47,7 +47,7 @@ export function SettlementsPage() {
           <Stat label="Still to receive" value={m(sum.data.totals.outstandingReceivableMinor)} tone={sum.data.totals.outstandingReceivableMinor > 0 ? 'receive' : undefined} />
           <Stat label="Settled so far" value={m(sum.data.totals.settledMinor)} hint={`${sum.data.counts.official} payment${sum.data.counts.official === 1 ? '' : 's'}`} />
           <Stat label="Payments needed" value={String(sum.data.counts.recommendedTransfers)} />
-          {sum.data.totals.externalMinor > 0 && <Stat label="Paid from business funds" value={m(sum.data.totals.externalMinor)} hint="External — not part of any payment above" />}
+          {sum.data.totals.businessBorneMinor > 0 && <Stat label="Reimbursed by the business" value={m(sum.data.totals.businessBorneMinor)} hint="Business-borne — not part of any payment above" />}
         </dl>
         {sum.data.counts.awaitingApproval > 0 && <p className="mt-4 text-sm text-ink-muted">{sum.data.counts.awaitingApproval} settlement{sum.data.counts.awaitingApproval === 1 ? ' is' : 's are'} waiting for approval and not counted yet.</p>}
       </section>
