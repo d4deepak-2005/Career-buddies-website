@@ -11,6 +11,8 @@ Every rule in this document carries **exactly one** of four labels. They are not
 | **IMPLEMENTATION ASSUMPTION** | The PDF is silent. A decision was needed to make the engine well-defined. Needs product-owner confirmation. |
 | **PHASE 3 LIMITATION** | Something the system deliberately does *not* model yet. |
 
+> **Open product decisions** (IA-4, IA-5, founder-to-founder reimbursement, capital pool, loan repayment, refund linking) are set out, with alternatives and risks, in [PHASE-3-OPEN-DECISIONS.md](PHASE-3-OPEN-DECISIONS.md). The behaviour below is unchanged until the product owner decides.
+
 > **Phase 4+ is not built.** No dashboard KPIs/charts, approval workflow or approve/reject UI, recurring expenses, reports, hardening or launch work.
 
 ---
