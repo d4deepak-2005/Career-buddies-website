@@ -164,3 +164,7 @@ Please decide, in your own words:
 | 3 | Capital pool | **No** | Not modelled | PHASE 3 LIMITATION |
 | 4 | Loan repayment | **No** | Not modelled | PHASE 3 LIMITATION |
 | 5 | Refund ↔ expense link | **No** | Not linked | IMPLEMENTATION ASSUMPTION / PHASE 3 LIMITATION |
+
+## Note added in Phase 4
+
+The dashboard introduced presentation interpretations that the PDF does not define (Total Investment = capital + loans, Founder Capital = capital only, period vs cumulative semantics, founder/category filter meaning). They are **implementation assumptions** documented in [PHASE-4-DASHBOARD.md](PHASE-4-DASHBOARD.md) §3 and need product-owner confirmation; none changes an accounting rule. Decisions 2–5 above remain open.

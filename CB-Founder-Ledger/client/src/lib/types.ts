@@ -75,3 +75,30 @@ export interface SettlementSummaryResponse {
   history: Array<{ id: string; txnNumber: string; transactionDate: string; status: TransactionStatus; payer: Named | null; receiver: Named | null; amountMinor: number; method: string | null; counted: boolean }>;
   reconciliation: Reconciliation; warnings: CalcWarning[];
 }
+
+/** Phase 4 — GET /api/dashboard. Everything is computed by the server; the client formats it and draws it. */
+export interface DashboardResponse {
+  calculatedAt: string; currency: { code: string; minorUnits: number };
+  filters: { from: string | null; to: string | null; founderId: string | null; categoryId: string | null };
+  kpis: {
+    totalInvestmentMinor: number; founderCapitalMinor: number; loansMinor: number; totalBusinessExpensesMinor: number; reimbursedByBusinessMinor: number;
+    founderFundedExpensesMinor: number; refundsMinor: number; settledMinor: number; outstandingSettlementsMinor: number;
+  };
+  founders: Array<{
+    founderId: string; name: string; active: boolean; contributionMinor: number; loanOutstandingMinor: number; investedMinor: number; paidMinor: number;
+    fairShareMinor: number; netPositionMinor: number; outstandingMinor: number; action: PositionAction; reimbursedMinor: number;
+  }>;
+  charts: {
+    contributionByFounder: Array<{ founderId: string; name: string; contributionMinor: number; loanMinor: number }>;
+    expenseByCategory: Array<{ categoryId: string | null; name: string; amountMinor: number; other: boolean; shareBp: number }>;
+    monthly: Array<{ month: string; expensesMinor: number; investmentMinor: number }>;
+  };
+  settlement: { recommendations: Array<{ payer: Named; receiver: Named; amountMinor: number }>; unresolvedMinor: number };
+  recent: Array<{
+    id: string; txnNumber: string; date: string; type: TransactionType; status: TransactionStatus; description: string; amountMinor: number;
+    category: Named | null; paidBy: Named | null; counterparty: Named | null; counted: boolean;
+  }>;
+  counts: { matchingTransactions: number; notCountedYet: number };
+  reconciliation: { status: 'PASS' | 'REVIEW' | 'FAIL'; isBalanced: boolean; sumNetPositionMinor: number; businessBorneMinor: number };
+  warnings: number;
+}

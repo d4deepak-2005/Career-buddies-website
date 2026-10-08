@@ -33,3 +33,8 @@ export function formatSignedMinor(minor: number, c: CurrencyConfig): string {
   const body = formatMinor(Math.abs(minor), c);
   return minor > 0 ? `+${body}` : minor < 0 ? `−${body}` : body;
 }
+
+/** Display only (chart axis labels): "₹1.2L"-style compact text for a server-provided amount. */
+export function formatCompactMinor(minor: number, c: CurrencyConfig): string {
+  return new Intl.NumberFormat(undefined, { style: 'currency', currency: c.code, notation: 'compact', maximumFractionDigits: 1 }).format(minor / 10 ** c.minorUnits);
+}

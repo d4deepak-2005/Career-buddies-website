@@ -37,6 +37,7 @@ The API is same-origin from the browser's point of view (nginx in Docker, Vite p
 | `domain/` | **Pure business rules**, no I/O: `splits.ts` (split validation + per-transaction allocation), `transactionRules.ts` (type rules, status lifecycle). Phase 3 will add the calculation/settlement engine here |
 | `domain/calculationEngine.ts`, `domain/settlementAlgorithm.ts` | **Phase 3 — the single source of truth for money results.** Pure functions over stored transactions + founders: fair share, paid, net position, outstanding, settlement recommendations, with a traceable per-transaction ledger of effects. Only `approved` transactions count |
 | `modules/transactions/reimbursements.ts` | **Option C**: reimbursement target checks, atomic capacity reservation/release on the expense (`reimbursedMinor`), linked-reimbursement lookups, picker query |
+| `domain/dashboard.ts`, `modules/dashboard/*` | **Phase 4**: pure period/filter selection and summing of the engine's results; one read-only endpoint `GET /api/dashboard`. No second calculation path |
 | `modules/financials/*` | Loads founders + transactions (one query each, minimal fields), calls the engine, shapes read-only API responses. No caching; recomputed per request |
 | `storage/receiptStorage.ts` | `ReceiptStorage` interface + local private-directory implementation (swap for object storage) |
 | `lib/` | Password hashing, token helpers, `AppError`, `asyncHandler` |
@@ -95,3 +96,7 @@ Tokens in `tailwind.config.js` come from the official logo/website palette: navy
 - categories also carry `isDevSeed`.
 
 Founders, categories and transactions are deactivated / voided, never deleted. Receipt bytes are never stored in MongoDB.
+
+## Dashboard (Phase 4)
+
+`client/src/features/dashboard/` renders `GET /api/dashboard`. The server loads founders + transactions once, runs the Phase 3 engine (as of the period end), and `domain/dashboard.ts` selects/sums engine results for the period and filters. The browser only formats numbers and draws charts (pixel geometry only; a test forbids money arithmetic and `.reduce` in these files). Filters live in the URL query string, are validated by the server (strict Zod), and every widget uses the same response, so periods cannot disagree between cards, charts and lists. Details and every interpretation in [PHASE-4-DASHBOARD.md](PHASE-4-DASHBOARD.md).

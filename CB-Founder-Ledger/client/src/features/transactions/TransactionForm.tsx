@@ -1,6 +1,6 @@
 import { Check, Paperclip, X } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../../auth/AuthContext';
 import { ErrorBox, FieldError, Label, detailsByPath } from '../../components/ui';
 import { ApiError, api } from '../../lib/api';
@@ -66,16 +66,19 @@ export function TransactionForm({ existing }: { existing?: Transaction }) {
   const cfg = useAppConfig();
   const { user } = useAuth();
   const navigate = useNavigate();
+  // The dashboard's "Settle" button prefills a settlement. Only suggestions: every value is re-validated by the server on submit.
+  const [prefill] = useSearchParams();
+  const pre = !existing && prefill.get('type') === 'settlement' && /^\d{1,12}$/.test(prefill.get('amount') ?? '') ? { paidBy: prefill.get('paidBy') ?? '', counterparty: prefill.get('counterparty') ?? '', amount: Number(prefill.get('amount')) } : null;
   const units = cfg.currency.minorUnits;
   const foundersRes = useResource<{ founders: Founder[] }>('/founders');
   const categoriesRes = useResource<{ categories: Category[] }>('/categories');
   const founders = useMemo(() => foundersRes.data?.founders.filter((f) => f.active || existing?.paidBy?.id === f.id || existing?.counterparty?.id === f.id || existing?.split?.entries.some((e) => e.founderId === f.id)) ?? [], [foundersRes.data, existing]);
   const categories = useMemo(() => categoriesRes.data?.categories.filter((c) => c.active || existing?.category?.id === c.id) ?? [], [categoriesRes.data, existing]);
 
-  const [type, setType] = useState<TransactionType>(existing?.type ?? 'business_expense');
-  const [amount, setAmount] = useState(existing ? minorToInput(existing.amountMinor, units) : '');
+  const [type, setType] = useState<TransactionType>(existing?.type ?? (pre ? 'settlement' : 'business_expense'));
+  const [amount, setAmount] = useState(existing ? minorToInput(existing.amountMinor, units) : pre ? minorToInput(pre.amount, units) : '');
   const [date, setDate] = useState(existing?.transactionDate ?? today());
-  const [description, setDescription] = useState(existing?.description ?? '');
+  const [description, setDescription] = useState(existing?.description ?? (pre ? 'Settlement payment' : ''));
   const [notes, setNotes] = useState(existing?.notes ?? '');
   const [method, setMethod] = useState(existing?.method ?? '');
   const [categoryId, setCategoryId] = useState(existing?.category?.id ?? '');
@@ -108,7 +111,8 @@ export function TransactionForm({ existing }: { existing?: Transaction }) {
       setSplit({ method: existing.split.method, rows });
     } else {
       setSplit(emptySplit(founders, true));
-      if (!existing) setPaidBy(founders.find((f) => f.userId === user?.id)?.id ?? '');
+      if (!existing) setPaidBy(pre && founders.some((f) => f.id === pre.paidBy) ? pre.paidBy : founders.find((f) => f.userId === user?.id)?.id ?? '');
+      if (pre && founders.some((f) => f.id === pre.counterparty)) setCounterparty(pre.counterparty);
     }
   }, [founders, existing, units, user?.id]);
 

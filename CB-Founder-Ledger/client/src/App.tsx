@@ -3,6 +3,7 @@ import { Navigate, Route, Routes } from 'react-router-dom';
 import { AppShell } from './components/AppShell';
 import { ModulePlaceholder } from './components/ModulePlaceholder';
 import { ProtectedRoute } from './components/ProtectedRoute';
+import { DashboardPage } from './features/dashboard/DashboardPage';
 import { FounderLedgerPage } from './features/financials/FounderLedgerPage';
 import { FoundersPage } from './features/financials/FoundersPage';
 import { SettlementsPage } from './features/financials/SettlementsPage';
@@ -16,6 +17,7 @@ import { LoginPage } from './pages/LoginPage';
 
 /** Modules with a real implementation. Everything else renders a placeholder until its phase. */
 const IMPLEMENTED: Record<string, ReactElement> = {
+  '/dashboard': <DashboardPage />,
   '/transactions': <TransactionsPage />,
   '/transactions/new': <AddTransactionPage />,
   '/founders': <FoundersPage />,

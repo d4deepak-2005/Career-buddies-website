@@ -5,7 +5,7 @@ import { Transaction } from '../../models/Transaction';
 
 interface StoredTx {
   _id: unknown; txnNumber: string; type: TransactionType; status: TransactionStatus; amountMinor: number; description: string;
-  transactionDate: Date; method?: string | null; paidByFounderId?: unknown; counterpartyFounderId?: unknown; reimbursesTransactionId?: unknown;
+  transactionDate: Date; method?: string | null; paidByFounderId?: unknown; counterpartyFounderId?: unknown; categoryId?: unknown; reimbursesTransactionId?: unknown;
   split?: { entries: Array<{ founderId: unknown; allocatedMinor: number }> } | null;
 }
 
@@ -19,19 +19,20 @@ export interface Loaded {
 const idOrNull = (v: unknown) => (v ? String(v) : null);
 
 /**
+ * `asOf` (dashboard period end, YYYY-MM-DD) feeds the engine only transactions dated on or before it, so balances are "as of" that day.
  * Recomputes everything from the database on every call (spec C-13): no cache to invalidate, so edits,
  * voids and new settlements are visible immediately. Only the fields the engine needs are read.
  */
-export async function loadCalculation(): Promise<Loaded> {
+export async function loadCalculation(opts: { asOf?: string } = {}): Promise<Loaded> {
   const [founders, stored] = await Promise.all([
     Founder.find().sort({ createdAt: 1, _id: 1 }).select('name active').lean(),
     Transaction.find()
-      .select('txnNumber type status amountMinor description transactionDate method paidByFounderId counterpartyFounderId reimbursesTransactionId split.entries.founderId split.entries.allocatedMinor')
+      .select('txnNumber type status amountMinor description transactionDate method paidByFounderId counterpartyFounderId categoryId reimbursesTransactionId split.entries.founderId split.entries.allocatedMinor')
       .sort({ transactionDate: 1, _id: 1 })
       .lean<StoredTx[]>(),
   ]);
 
-  const calcTxs: CalcTransaction[] = stored.map((t) => ({
+  const calcTxs: CalcTransaction[] = stored.filter((t) => !opts.asOf || t.transactionDate.toISOString().slice(0, 10) <= opts.asOf).map((t) => ({
     id: String(t._id),
     txnNumber: t.txnNumber,
     transactionDate: t.transactionDate.toISOString().slice(0, 10),

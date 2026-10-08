@@ -9,6 +9,7 @@ import { rejectUnsafeKeys } from './middleware/sanitize';
 import { authRouter } from './modules/auth/auth.routes';
 import { configRouter } from './modules/config/config.routes';
 import { categoriesRouter } from './modules/categories/categories.routes';
+import { dashboardRouter } from './modules/dashboard/dashboard.routes';
 import { founderFinancialsRouter, settlementsRouter } from './modules/financials/financials.routes';
 import { foundersRouter } from './modules/founders/founders.routes';
 import { healthRouter } from './modules/health/health.routes';
@@ -45,6 +46,7 @@ export function createApp(): Express {
   app.use('/api/founders', founderFinancialsRouter);
   app.use('/api/founders', foundersRouter);
   app.use('/api/settlements', settlementsRouter);
+  app.use('/api/dashboard', dashboardRouter);
   app.use('/api/categories', categoriesRouter);
   app.use('/api/config', configRouter);
   app.use('/api/transactions', transactionsRouter);

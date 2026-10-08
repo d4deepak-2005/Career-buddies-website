@@ -185,6 +185,28 @@ describe('add transaction form', () => {
     });
   });
 
+  describe('settlement prefill from the dashboard "Settle" button', () => {
+    it('prefills a settlement (type, payer, receiver, amount) but still goes through the normal validated form', async () => {
+      let posted: Record<string, unknown> | null = null;
+      mockFetch({ ...me(founderUser), 'POST /transactions': (_u, init) => { posted = body(init); return { status: 201, body: { transaction: tx({ type: 'settlement' }) } }; }, 'GET /transactions/t1': { status: 200, body: { transaction: tx(), receipts: [] } }, 'GET /transactions/t1/history': { status: 200, body: { history: [] } } });
+      renderApp('/transactions/new?type=settlement&paidBy=f2&counterparty=f1&amount=66667');
+      expect(await screen.findByLabelText(/Amount/)).toHaveValue('666.67');
+      expect(screen.getByRole('radio', { name: 'Settlement' })).toHaveAttribute('aria-checked', 'true');
+      await waitFor(() => expect(within(screen.getByRole('radiogroup', { name: 'Who paid?' })).getByRole('radio', { name: /Bilal/ })).toHaveAttribute('aria-checked', 'true'));
+      await waitFor(() => expect(within(screen.getByRole('radiogroup', { name: 'Who received the money?' })).getByRole('radio', { name: /Asha/ })).toHaveAttribute('aria-checked', 'true'));
+      await userEvent.click(screen.getByRole('button', { name: 'Submit for approval' }));
+      await screen.findByRole('heading', { name: 'Cloud hosting' });
+      expect(posted).toMatchObject({ type: 'settlement', amountMinor: 66667, paidByFounderId: 'f2', counterpartyFounderId: 'f1', status: 'pending_approval' });
+    });
+    it('ignores malformed or unknown prefill values', async () => {
+      mockFetch(me(founderUser));
+      renderApp('/transactions/new?type=settlement&paidBy=zzz&counterparty=yyy&amount=1e9');
+      await screen.findByLabelText(/Amount/);
+      expect(screen.getByLabelText(/Amount/)).toHaveValue('');
+      expect(screen.getByRole('radio', { name: 'Business Expense' })).toHaveAttribute('aria-checked', 'true');
+    });
+  });
+
   it('shows server-side field errors returned by the API', async () => {
     mockFetch({
       ...me(founderUser),

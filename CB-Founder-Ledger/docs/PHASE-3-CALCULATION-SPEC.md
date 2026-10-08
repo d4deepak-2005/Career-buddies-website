@@ -196,3 +196,7 @@ Reimbursement endpoints live in [PHASE-2.md](PHASE-2.md) (amended): `reimbursesT
 * **API** (`financials`, `reimbursements`, real MongoDB): authentication, authorization, invalid ids, no data, multiple types, edit/void/settlement reflected immediately, the 25 Option C reimbursement cases (link rules, cap, concurrency, void guard, picker), over-settlement, "Other".
 * **Client**: displays server values verbatim (deliberately inconsistent data), names the business-borne amount and every reconciliation status in words, expense picker, server error display, no arithmetic on money values in the financial views.
 * **Browser**: `tests/browser/optionc-browser.mjs` end-to-end against Docker at desktop / tablet / mobile with hand-computed expectations and API-equals-display checks. `tests/docker-reimbursement-e2e.sh` runs the same business flow over HTTP.
+
+## 10. Phase 4 consumers
+
+The Phase 4 dashboard reads these results through `GET /api/dashboard` without changing any rule above (see [PHASE-4-DASHBOARD.md](PHASE-4-DASHBOARD.md)). The engine may now be run over transactions dated on or before a period end (`loadCalculation({asOf})`) to present balances "as of" that date; that is a view parameter, not a new accounting rule. KPI definitions that the PDF does not give (Total Investment, Founder Capital, period attribution of reimbursements) are implementation assumptions listed there.

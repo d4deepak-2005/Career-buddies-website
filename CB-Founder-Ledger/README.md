@@ -1,6 +1,6 @@
 # CareerBuddies Founder Finance
 
-Private, responsive web app for the three CareerBuddies founders (investment, expenses, settlements). MongoDB is the source of truth; all financial logic will live in the backend. **Current state: Phase 3 — Calculation engine, with Option C expense-linked reimbursements** on top of Phase 1 (foundation) and Phase 2 (transactions, splits, receipts). The server calculates each founder's paid, fair share, net position, outstanding balance and a settlement recommendation from **approved** transactions only; the client just displays them. **Not built:** dashboard KPIs/charts (Phase 4), the approval workflow and approve/reject UI (Phase 5), recurring (6), reports (7), hardening (8), launch (9). Until Phase 5, nothing can become *approved* through the app, so positions read zero in a real deployment; tests approve records with a controlled database write. A reimbursement must name the one approved expense it pays back; the reimbursed part is borne by the business and founders share only the rest (label: *implementation assumption — product-owner decision*; the PDF is silent). Net position stays `Paid − Fair share` (*inferred from the Product Plan example*). Known limits (*Phase 3 limitation*): approval only via fixtures until Phase 5, one payer per expense, no loan repayment/refund linking/capital pool. See [`docs/PHASE-3-CALCULATION-SPEC.md`](docs/PHASE-3-CALCULATION-SPEC.md) (what is from the PDF vs. assumed), [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md), [`docs/PHASE-1.md`](docs/PHASE-1.md), [`docs/PHASE-2.md`](docs/PHASE-2.md).
+Private, responsive web app for the three CareerBuddies founders (investment, expenses, settlements). MongoDB is the source of truth; all financial logic will live in the backend. **Current state: Phase 4 — Dashboard** (KPIs, charts, founder cards, settlement summary with a Settle action, recent transactions, period/founder/category filters; spec and decisions in [`docs/PHASE-4-DASHBOARD.md`](docs/PHASE-4-DASHBOARD.md)) over **Phase 3 — Calculation engine, with Option C expense-linked reimbursements**, on top of Phase 1 (foundation) and Phase 2 (transactions, splits, receipts). The server calculates each founder's paid, fair share, net position, outstanding balance and a settlement recommendation from **approved** transactions only; the client just displays them. **Not built:** the approval workflow and approve/reject UI (Phase 5), recurring (6), reports (7), hardening (8), launch (9). Until Phase 5, nothing can become *approved* through the app, so positions read zero in a real deployment; tests approve records with a controlled database write. A reimbursement must name the one approved expense it pays back; the reimbursed part is borne by the business and founders share only the rest (label: *implementation assumption — product-owner decision*; the PDF is silent). Net position stays `Paid − Fair share` (*inferred from the Product Plan example*). Known limits (*Phase 3 limitation*): approval only via fixtures until Phase 5, one payer per expense, no loan repayment/refund linking/capital pool. See [`docs/PHASE-3-CALCULATION-SPEC.md`](docs/PHASE-3-CALCULATION-SPEC.md) (what is from the PDF vs. assumed), [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md), [`docs/PHASE-1.md`](docs/PHASE-1.md), [`docs/PHASE-2.md`](docs/PHASE-2.md).
 
 Stack: React 19 · TypeScript (strict) · Vite · Tailwind CSS 3 · Lucide — Node 22 · Express 4 · Mongoose 8 · Zod · MongoDB 7.
 
@@ -59,7 +59,7 @@ npm --prefix server run reconcile:reimbursements   # read-only: reports drift be
 npm --prefix client test      # routing, login flow, API client, transactions list/form/detail, settings, founders / ledger / settlements views
 ```
 
-### Docker and browser verification (Option C)
+### Docker and browser verification (Option C, Phase 4)
 
 ```bash
 # with the Docker stack up and the admin seeded (section 2):
@@ -69,7 +69,11 @@ tests/docker-reimbursement-e2e.sh           # approved-path flow: reimburse, ove
 PLAYWRIGHT_MODULE=<path to playwright/index.mjs> node tests/browser/optionc-browser.mjs   # desktop + tablet + mobile browser flow
 ```
 
-These create `[...]`-tagged throwaway records; run them against a disposable stack and finish with `docker compose ... down -v`.
+```bash
+node tests/browser/dashboard-browser.mjs     # Phase 4: needs a FRESH stack (checks the empty state first); desktop/tablet/mobile/narrow
+```
+
+These create throwaway records; run them against a disposable stack and finish with `docker compose ... down -v`.
 
 ## 4. Typecheck
 
@@ -87,7 +91,7 @@ docker compose --env-file .env -f docker/docker-compose.yml build    # container
 
 ## API
 
-Transactions, splits and receipts endpoints are listed in [`docs/PHASE-2.md`](docs/PHASE-2.md#api-all-under-api-all-require-a-signed-in-user). **Phase 3 (read-only, any signed-in user, empty query string only):** `GET /api/founders/financial-positions`, `GET /api/founders/:id/financial-position`, `GET /api/settlements/recommendations`, `GET /api/settlements/summary` — contract in [`docs/PHASE-3-CALCULATION-SPEC.md`](docs/PHASE-3-CALCULATION-SPEC.md#8-api-contract-all-authenticated-read-only-query-strings-must-be-empty). Phase 1 endpoints:
+Transactions, splits and receipts endpoints are listed in [`docs/PHASE-2.md`](docs/PHASE-2.md#api-all-under-api-all-require-a-signed-in-user). **Phase 3 (read-only, any signed-in user, empty query string only):** `GET /api/founders/financial-positions`, `GET /api/founders/:id/financial-position`, `GET /api/settlements/recommendations`, `GET /api/settlements/summary`; **Phase 4:** `GET /api/dashboard?from&to&founderId&categoryId` (read-only aggregate, see PHASE-4-DASHBOARD.md) — contract in [`docs/PHASE-3-CALCULATION-SPEC.md`](docs/PHASE-3-CALCULATION-SPEC.md#8-api-contract-all-authenticated-read-only-query-strings-must-be-empty). Phase 1 endpoints:
 
 | Method & path | Access |
 |---|---|
