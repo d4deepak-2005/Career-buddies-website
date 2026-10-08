@@ -10,6 +10,7 @@ import { Transaction, type TransactionDoc } from '../../models/Transaction';
 import { REVISION_ACTIONS, TransactionRevision } from '../../models/TransactionRevision';
 import { User } from '../../models/User';
 import type { AuthUser } from '../../middleware/auth';
+import { activeLinkedReimbursements, capacityError, checkReimbursementTarget, hasLinkedError, heldBy, releaseCapacity, reserveCapacity } from './reimbursements';
 import type { ListQuery, TransactionContent } from './transactions.schemas';
 
 type Issue = { path: string; message: string; code?: string };
@@ -31,8 +32,10 @@ async function validateContent(content: TransactionContent, existing?: Existing)
     counterpartyFounderId: content.counterpartyFounderId,
     notes: content.notes,
     method: content.method,
+    reimbursesTransactionId: content.reimbursesTransactionId,
     hasSplit: !!content.split,
   });
+  if (content.type === 'reimbursement') issues.push(...(await checkReimbursementTarget(content)));
 
   if (content.categoryId) {
     const cat = await Category.findById(content.categoryId).select('active').lean();
@@ -97,6 +100,7 @@ function fieldsFor(content: TransactionContent, resolved?: SplitEntryResolved[])
     description: content.description,
     notes: content.notes?.trim() || undefined,
     method: content.method?.trim() || undefined,
+    reimbursesTransactionId: content.type === 'reimbursement' ? content.reimbursesTransactionId : undefined,
     categoryId: content.categoryId,
     paidByFounderId: content.paidByFounderId,
     counterpartyFounderId: content.counterpartyFounderId,
@@ -121,6 +125,7 @@ function contentFromStored(tx: StoredTx): TransactionContent {
     description: tx.description,
     ...(tx.notes ? { notes: tx.notes } : {}),
     ...(tx.method ? { method: tx.method } : {}),
+    ...(tx.reimbursesTransactionId ? { reimbursesTransactionId: String(tx.reimbursesTransactionId) } : {}),
     ...(tx.categoryId ? { categoryId: String(tx.categoryId) } : {}),
     ...(tx.paidByFounderId ? { paidByFounderId: String(tx.paidByFounderId) } : {}),
     ...(tx.counterpartyFounderId ? { counterpartyFounderId: String(tx.counterpartyFounderId) } : {}),
@@ -155,11 +160,14 @@ export async function hydrate(txs: StoredTx[]) {
     for (const f of referencedFounderIds(t)) founderIds.add(f);
     if (t.categoryId) categoryIds.add(String(t.categoryId));
   }
-  const [users, founders, categories] = await Promise.all([
+  const targetIds = [...new Set(txs.map((t) => idStr(t.reimbursesTransactionId)).filter((x): x is string => !!x))];
+  const [users, founders, categories, targets] = await Promise.all([
     User.find({ _id: trusted({ $in: [...userIds] }) }).select('name').lean(),
     Founder.find({ _id: trusted({ $in: [...founderIds] }) }).select('name').lean(),
     Category.find({ _id: trusted({ $in: [...categoryIds] }) }).select('name').lean(),
+    targetIds.length ? Transaction.find({ _id: trusted({ $in: targetIds }) }).select('txnNumber description amountMinor').lean() : Promise.resolve([]),
   ]);
+  const targetById = new Map(targets.map((x) => [String(x._id), { id: String(x._id), txnNumber: x.txnNumber, description: x.description, amountMinor: x.amountMinor }]));
   const u = new Map(users.map((x) => [String(x._id), x.name]));
   const f = new Map(founders.map((x) => [String(x._id), x.name]));
   const c = new Map(categories.map((x) => [String(x._id), x.name]));
@@ -173,6 +181,11 @@ export async function hydrate(txs: StoredTx[]) {
     description: t.description,
     notes: t.notes ?? null,
     method: t.method ?? null,
+    // Option C. Reimbursement: the expense it reimburses. Expense: how much is already reserved by active reimbursements (display only).
+    reimbursesTransactionId: idStr(t.reimbursesTransactionId) ?? null,
+    reimbursesTransaction: t.reimbursesTransactionId ? (targetById.get(String(t.reimbursesTransactionId)) ?? null) : null,
+    reimbursedMinor: t.type === 'business_expense' ? (t.reimbursedMinor ?? 0) : null,
+    remainingReimbursableMinor: t.type === 'business_expense' ? Math.max(t.amountMinor - (t.reimbursedMinor ?? 0), 0) : null,
     category: named(c, t.categoryId),
     paidBy: named(f, t.paidByFounderId),
     counterparty: named(f, t.counterpartyFounderId),
@@ -220,14 +233,23 @@ const conflict = (current: number) => new AppError(409, 'VERSION_CONFLICT', 'Thi
 
 export async function createTransaction(content: TransactionContent, status: 'draft' | 'pending_approval', actor: AuthUser) {
   const resolved = await validateContent(content);
-  const seq = await nextSequence('transaction');
-  const created = await Transaction.create({
-    ...fieldsFor(content, resolved),
-    txnNumber: `TXN-${String(seq).padStart(6, '0')}`,
-    status,
-    createdBy: actor.id,
-    updatedBy: actor.id,
-  });
+  // Option C: reserve the expense's capacity atomically BEFORE writing, so concurrent reimbursements cannot exceed it.
+  const reserved = content.type === 'reimbursement' && content.reimbursesTransactionId ? { expenseId: content.reimbursesTransactionId, amount: content.amountMinor } : null;
+  if (reserved && !(await reserveCapacity(reserved.expenseId, reserved.amount))) throw await capacityError(reserved.expenseId);
+  let created;
+  try {
+    const seq = await nextSequence('transaction');
+    created = await Transaction.create({
+      ...fieldsFor(content, resolved),
+      txnNumber: `TXN-${String(seq).padStart(6, '0')}`,
+      status,
+      createdBy: actor.id,
+      updatedBy: actor.id,
+    });
+  } catch (err) {
+    if (reserved) await releaseCapacity(reserved.expenseId, reserved.amount); // roll back the reservation
+    throw err;
+  }
   const tx = created.toObject() as unknown as StoredTx;
   await recordRevision(tx, 'created', actor.id);
   return tx;
@@ -253,6 +275,19 @@ export async function updateTransaction(id: string, patch: Patch, actor: AuthUse
   const content = contentParser(merged); // strict re-validation of the full document
   const resolved = await validateContent(content, { categoryId: idStr(existing.categoryId), founderIds: referencedFounderIds(existing) });
 
+  // Option C: adjust the capacity this reimbursement holds (before the write; compensated if the write fails).
+  const oldHeld = heldBy(existing);
+  const newHeld = content.type === 'reimbursement' && content.reimbursesTransactionId ? { expenseId: content.reimbursesTransactionId, amount: content.amountMinor } : null;
+  let newlyReserved: { expenseId: string; amount: number } | null = null;
+  if (newHeld) {
+    const sameExpense = oldHeld?.expenseId === newHeld.expenseId;
+    const needed = sameExpense ? newHeld.amount - oldHeld.amount : newHeld.amount;
+    if (needed > 0) {
+      if (!(await reserveCapacity(newHeld.expenseId, needed))) throw await capacityError(newHeld.expenseId);
+      newlyReserved = { expenseId: newHeld.expenseId, amount: needed };
+    }
+  }
+
   const fields = fieldsFor(content, resolved);
   const set: Record<string, unknown> = { updatedBy: actor.id };
   const unset: Record<string, 1> = {};
@@ -264,9 +299,15 @@ export async function updateTransaction(id: string, patch: Patch, actor: AuthUse
     { new: true },
   ).lean<StoredTx>();
   if (!updated) {
+    if (newlyReserved) await releaseCapacity(newlyReserved.expenseId, newlyReserved.amount); // roll back
     const now = await loadOr404(id);
     if (!EDITABLE_STATUSES.includes(now.status)) throw new AppError(409, 'NOT_EDITABLE', 'This transaction can no longer be edited');
     throw conflict(now.version);
+  }
+  // Write succeeded: give back whatever the OLD link no longer needs.
+  if (oldHeld) {
+    const keep = newHeld && newHeld.expenseId === oldHeld.expenseId ? Math.min(newHeld.amount, oldHeld.amount) : 0;
+    await releaseCapacity(oldHeld.expenseId, oldHeld.amount - keep);
   }
   await recordRevision(updated, 'edited', actor.id);
   return updated;
@@ -291,12 +332,26 @@ export async function voidTransaction(id: string, expectedVersion: number, reaso
   const existing = await loadOr404(id);
   if (!canTransition(existing.status, 'voided')) throw new AppError(409, 'INVALID_TRANSITION', 'This transaction is already voided');
   if (existing.version !== expectedVersion) throw conflict(existing.version);
+  const isExpense = existing.type === 'business_expense';
+  // Option C guard: an expense cannot be voided while active reimbursements are linked to it (void them first).
+  if (isExpense) {
+    const linked = await activeLinkedReimbursements(id);
+    if (linked.length > 0) throw hasLinkedError(linked);
+  }
   const updated = await Transaction.findOneAndUpdate(
-    { _id: id, version: expectedVersion, status: trusted({ $ne: 'voided' as TransactionStatus }) },
+    // For an expense the write is also conditional on "nothing reserved", closing the race with a reimbursement being created right now.
+    { _id: id, version: expectedVersion, status: trusted({ $ne: 'voided' as TransactionStatus }), ...(isExpense ? { reimbursedMinor: trusted({ $in: [0, null] }) } : {}) },
     { $set: { status: 'voided', updatedBy: actor.id, void: { reason, voidedBy: actor.id, voidedAt: new Date() } }, $inc: { version: 1 } },
     { new: true },
   ).lean<StoredTx>();
-  if (!updated) throw conflict((await loadOr404(id)).version);
+  if (!updated) {
+    const now = await loadOr404(id);
+    if (isExpense && (now.reimbursedMinor ?? 0) > 0) throw hasLinkedError(await activeLinkedReimbursements(id));
+    throw conflict(now.version);
+  }
+  // Voiding a reimbursement restores the expense's founder-funded amount: give its reserved capacity back.
+  const held = heldBy(existing);
+  if (held) await releaseCapacity(held.expenseId, held.amount);
   await recordRevision(updated, 'voided', actor.id, { reason });
   return updated;
 }

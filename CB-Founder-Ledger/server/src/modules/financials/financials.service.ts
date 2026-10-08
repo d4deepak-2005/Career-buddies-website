@@ -5,7 +5,7 @@ import { Transaction } from '../../models/Transaction';
 
 interface StoredTx {
   _id: unknown; txnNumber: string; type: TransactionType; status: TransactionStatus; amountMinor: number; description: string;
-  transactionDate: Date; method?: string | null; paidByFounderId?: unknown; counterpartyFounderId?: unknown;
+  transactionDate: Date; method?: string | null; paidByFounderId?: unknown; counterpartyFounderId?: unknown; reimbursesTransactionId?: unknown;
   split?: { entries: Array<{ founderId: unknown; allocatedMinor: number }> } | null;
 }
 
@@ -26,7 +26,7 @@ export async function loadCalculation(): Promise<Loaded> {
   const [founders, stored] = await Promise.all([
     Founder.find().sort({ createdAt: 1, _id: 1 }).select('name active').lean(),
     Transaction.find()
-      .select('txnNumber type status amountMinor description transactionDate method paidByFounderId counterpartyFounderId split.entries.founderId split.entries.allocatedMinor')
+      .select('txnNumber type status amountMinor description transactionDate method paidByFounderId counterpartyFounderId reimbursesTransactionId split.entries.founderId split.entries.allocatedMinor')
       .sort({ transactionDate: 1, _id: 1 })
       .lean<StoredTx[]>(),
   ]);
@@ -34,9 +34,11 @@ export async function loadCalculation(): Promise<Loaded> {
   const calcTxs: CalcTransaction[] = stored.map((t) => ({
     id: String(t._id),
     txnNumber: t.txnNumber,
+    transactionDate: t.transactionDate.toISOString().slice(0, 10),
     type: t.type,
     status: t.status,
     amountMinor: t.amountMinor,
+    reimbursesTransactionId: idOrNull(t.reimbursesTransactionId),
     paidByFounderId: idOrNull(t.paidByFounderId),
     counterpartyFounderId: idOrNull(t.counterpartyFounderId),
     split: t.split ? { entries: t.split.entries.map((e) => ({ founderId: String(e.founderId), allocatedMinor: e.allocatedMinor })) } : null,
@@ -99,8 +101,8 @@ export function settlementSummary(l: Loaded) {
       outstandingPayableMinor: r.totalPayableMinor,
       outstandingReceivableMinor: r.totalReceivableMinor,
       recommendedTransfersMinor: r.recommendedTotalMinor,
-      /** Paid from business funds (reimbursements). Shown separately; never part of a founder-to-founder payment. */
-      externalMinor: r.externalMinor,
+      /** Reimbursed by the business (linked reimbursements). Business-borne: not recoverable from founders and not a balance. */
+      businessBorneMinor: r.businessBorneMinor,
     },
     counts: {
       official: official.size,

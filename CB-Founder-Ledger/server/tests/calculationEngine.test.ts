@@ -62,20 +62,19 @@ describe('contribution, loan, reimbursement, refund (items 12-15)', () => {
   it('13. loan principal is a separate metric and never enters fair share, paid or net', () => {
     const r = run(three, [loan(2_000_000, 'C')]);
     expect(pos(r, 'C')).toMatchObject({ loanOutstandingMinor: 2_000_000, fairShareMinor: 0, paidMinor: 0, grossNetPositionMinor: 0 });
-    expect(r.reconciliation).toMatchObject({ sumGrossNetPositionMinor: 0, externalMinor: 0, status: 'PASS' });
+    expect(r.reconciliation).toMatchObject({ sumGrossNetPositionMinor: 0, businessBorneMinor: 0, status: 'PASS' });
   });
-  it('14. reimbursement does not double-count the expense (fair share unchanged, paid offset once)', () => {
+  it('14. a linked reimbursement does not double-count the expense: it is counted once and the reimbursed part is business-borne', () => {
     const exp = expense(3_000, 'A', equal(['A', 'B', 'C']));
-    const base = run(three, [exp]);
-    const reimb = run(three, [exp, reimbursement(3_000, 'A')]);
-    expect(shares(reimb)).toEqual(shares(base)); // not counted as a second expense
-    expect(pos(reimb, 'A')).toMatchObject({ expensePaidMinor: 3_000, reimbursedMinor: 3_000, paidMinor: 0 });
-    expect(reimb.reconciliation.totalFairShareMinor).toBe(3_000); // 3,000 once, not 6,000
-    // reimbursement is business-funded: the 3,000 is reported as EXTERNAL, not hidden and not owed between founders
-    expect(reimb.reconciliation).toMatchObject({ externalMinor: 3_000, sumGrossNetPositionMinor: -3_000, founderBalanceSumMinor: 0 });
-    const partial = run(three, [exp, reimbursement(1_000, 'A')]);
+    const full = run(three, [exp, reimbursement(3_000, 'A', exp.id)]);
+    expect(pos(full, 'A')).toMatchObject({ expensePaidMinor: 3_000, reimbursedMinor: 3_000, paidMinor: 0 }); // paid once, then reimbursed
+    expect(shares(full)).toEqual([0, 0, 0]);                                                                   // nothing founder-funded is left
+    expect(full.reconciliation).toMatchObject({ totalFairShareMinor: 0, totalPaidMinor: 0, businessBorneMinor: 3_000, sumGrossNetPositionMinor: 0, status: 'PASS' });
+    const partial = run(three, [exp, reimbursement(1_000, 'A', exp.id)]);
     expect(pos(partial, 'A').paidMinor).toBe(2_000);
-    expect(partial.reconciliation.totalFairShareMinor).toBe(3_000);
+    expect(shares(partial)).toEqual([667, 667, 666]);                                                          // 2,000 founder-funded, largest remainder
+    expect(partial.reconciliation).toMatchObject({ totalFairShareMinor: 2_000, businessBorneMinor: 1_000, sumGrossNetPositionMinor: 0 });
+    expect(partial.expenses).toEqual([{ expenseId: exp.id, paidByFounderId: 'A', amountMinor: 3_000, reimbursedMinor: 1_000, founderFundedMinor: 2_000 }]);
   });
   it('15. refund reduces the expense it returns (paid and fair share), staying zero-sum', () => {
     const exp = expense(3_000, 'A', equal(['A', 'B', 'C']));
@@ -187,11 +186,12 @@ describe('recommendations from the engine (items 21-23)', () => {
     expect(after.founders.every((f) => f.outstandingMinor === 0)).toBe(true);
     expect(after.recommendations).toEqual([]);
   });
-  it('a business-funded reimbursement is external: it is never recommended as a founder-to-founder payment', () => {
-    const r = run(three, [expense(3_000, 'A', equal(['A', 'B', 'C'])), reimbursement(3_000, 'A')]);
+  it('a fully reimbursed expense leaves nothing to recommend: the business-borne part is not recoverable from founders', () => {
+    const exp = expense(3_000, 'A', equal(['A', 'B', 'C']));
+    const r = run(three, [exp, reimbursement(3_000, 'A', exp.id)]);
     expect(r.recommendations).toEqual([]);
     expect(r.founders.every((f) => f.action === 'settled' && f.outstandingMinor === 0)).toBe(true);
-    expect(r.reconciliation).toMatchObject({ externalMinor: 3_000, unresolvedPayableMinor: 0, unresolvedReceivableMinor: 0, isBalanced: true, status: 'PASS_WITH_EXTERNAL' });
+    expect(r.reconciliation).toMatchObject({ businessBorneMinor: 3_000, unresolvedPayableMinor: 0, unresolvedReceivableMinor: 0, isBalanced: true, status: 'PASS' });
   });
 });
 

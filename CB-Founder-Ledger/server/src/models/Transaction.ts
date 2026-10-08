@@ -47,6 +47,14 @@ const transactionSchema = new Schema(
     counterpartyFounderId: { type: Schema.Types.ObjectId, ref: 'Founder' },
     /** Settlement payment method (settlement type only). */
     method: { type: String, trim: true, maxlength: 50 },
+    /** Reimbursement only: the expense this reimbursement is for (exactly one). */
+    reimbursesTransactionId: { type: Schema.Types.ObjectId, ref: 'Transaction' },
+    /**
+     * Expense only: write-time GUARD. Amount reserved by active (draft / pending / approved) linked reimbursements.
+     * Updated atomically so two concurrent reimbursements can never both exceed the expense. The calculation engine
+     * never reads it; it recomputes from the linked reimbursements themselves.
+     */
+    reimbursedMinor: { type: Number, required: true, default: 0, min: 0 },
     transactionDate: { type: Date, required: true },
     status: { type: String, enum: TRANSACTION_STATUSES, required: true, default: 'pending_approval' },
     /** Split definition + resolved per-founder responsibility, embedded (no separate collection). */
@@ -69,6 +77,8 @@ transactionSchema.index({ categoryId: 1, transactionDate: -1 });
 transactionSchema.index({ paidByFounderId: 1, transactionDate: -1 });
 transactionSchema.index({ createdBy: 1, createdAt: -1 });
 transactionSchema.index({ amountMinor: 1 });
+// Option C: all reimbursements of an expense (cap, void guard, calculation).
+transactionSchema.index({ reimbursesTransactionId: 1, status: 1 }, { sparse: true });
 // Phase 3: founder-involvement lookups for the founder ledger.
 transactionSchema.index({ counterpartyFounderId: 1, transactionDate: -1 });
 transactionSchema.index({ 'split.entries.founderId': 1 });

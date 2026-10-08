@@ -79,7 +79,7 @@ describe('no data and official-record rules', () => {
     const b = await positions();
     expect(b.positions).toHaveLength(4); // 3 active + 1 inactive profile
     for (const p of b.positions) expect(p).toMatchObject({ paidMinor: 0, fairShareMinor: 0, grossNetPositionMinor: 0, outstandingMinor: 0, action: 'settled' });
-    expect(b.reconciliation).toMatchObject({ isBalanced: true, externalMinor: 0, status: 'PASS' });
+    expect(b.reconciliation).toMatchObject({ isBalanced: true, businessBorneMinor: 0, status: 'PASS' });
     expect((await w.a.get('/api/settlements/recommendations')).body.recommendations).toEqual([]);
     expect(b.currency).toEqual({ code: 'INR', minorUnits: 2 });
   });
@@ -140,18 +140,19 @@ describe('multiple transactions and the three-founder example', () => {
     expect(pos(b, w.f.a)).toMatchObject({ paidMinor: 1_000_000, fairShareMinor: 500_000 + 200_000, grossNetPositionMinor: 300_000 });
     expect(pos(b, w.f.b)).toMatchObject({ paidMinor: 600_000, fairShareMinor: 300_000 + 100_000 });
     expect(pos(b, w.f.c)).toMatchObject({ paidMinor: 0, fairShareMinor: 200_000 + 300_000, contributionMinor: 5_000_000, loanOutstandingMinor: 2_500_000, grossNetPositionMinor: -500_000 });
-    expect(b.reconciliation).toMatchObject({ totalPaidMinor: 1_600_000, totalFairShareMinor: 1_600_000, externalMinor: 0, status: 'PASS', isBalanced: true });
+    expect(b.reconciliation).toMatchObject({ totalPaidMinor: 1_600_000, totalFairShareMinor: 1_600_000, businessBorneMinor: 0, status: 'PASS', isBalanced: true });
   });
 
   it('reimbursement and refund through the API do not double count', async () => {
-    await create(w.a, expensePayload(w, { amountMinor: 3_000, split: equalAll(w) }));
-    await create(w.a, { type: 'reimbursement', amountMinor: 3_000, transactionDate: '2026-05-03', description: 'reimburse A', paidByFounderId: w.f.a });
+    const e1 = await create(w.a, expensePayload(w, { amountMinor: 3_000, split: equalAll(w) }));
+    await create(w.a, { type: 'reimbursement', amountMinor: 3_000, transactionDate: '2026-05-03', description: 'reimburse A', paidByFounderId: w.f.a, reimbursesTransactionId: e1.id });
     let b = await positions();
-    expect(b.reconciliation).toMatchObject({ totalFairShareMinor: 3_000, externalMinor: 3_000, sumGrossNetPositionMinor: -3_000, status: 'PASS_WITH_EXTERNAL', isBalanced: true });
+    expect(b.reconciliation).toMatchObject({ totalFairShareMinor: 0, totalPaidMinor: 0, businessBorneMinor: 3_000, sumGrossNetPositionMinor: 0, status: 'PASS', isBalanced: true });
     expect(pos(b, w.f.a)).toMatchObject({ expensePaidMinor: 3_000, reimbursedMinor: 3_000, paidMinor: 0 });
-    expect((await w.a.get('/api/settlements/recommendations')).body).toMatchObject({ recommendations: [], unresolvedPayableMinor: 0, reconciliation: { externalMinor: 3_000 } });
+    expect((await w.a.get('/api/settlements/recommendations')).body).toMatchObject({ recommendations: [], unresolvedPayableMinor: 0, reconciliation: { businessBorneMinor: 3_000 } });
     expect(b.positions.every((p: { action: string }) => p.action === 'settled')).toBe(true);
 
+    await create(w.a, expensePayload(w, { amountMinor: 3_000, split: equalAll(w) }));
     await create(w.a, { type: 'refund', amountMinor: 900, transactionDate: '2026-05-04', description: 'vendor refund', paidByFounderId: w.f.b, split: equalAll(w) });
     b = await positions();
     expect(b.reconciliation.totalFairShareMinor).toBe(2_100);
@@ -159,21 +160,22 @@ describe('multiple transactions and the three-founder example', () => {
   });
 });
 
-describe('external (business-funded) amount over the API', () => {
-  const reimburse = (to: string, amountMinor: number) => ({ type: 'reimbursement', amountMinor, transactionDate: '2026-05-03', description: 'reimburse', paidByFounderId: to });
+describe('business-borne (reimbursed) amount over the API', () => {
+  const reimburse = (to: string, amountMinor: number, expenseId: string) => ({ type: 'reimbursement', amountMinor, transactionDate: '2026-05-03', description: 'reimburse', paidByFounderId: to, reimbursesTransactionId: expenseId });
 
-  it('partial reimbursement: founders are treated symmetrically and the external amount is explicit', async () => {
-    await create(w.a, expensePayload(w, { amountMinor: 3_000, split: equalAll(w) }));
-    await create(w.a, reimburse(w.f.a, 1_000));
+  it('partial reimbursement: the reimbursed part is business-borne; founders share only the founder-funded part', async () => {
+    const e = await create(w.a, expensePayload(w, { amountMinor: 3_000, split: equalAll(w) }));
+    await create(w.a, reimburse(w.f.a, 1_000, e.id));
     const b = await positions();
-    expect(b.positions.slice(0, 3).map((p: Record<string, number>) => [p.grossNetPositionMinor, p.businessFundedShareMinor, p.founderBalanceMinor])).toEqual([[1_000, 334, 1_334], [-1_000, 333, -667], [-1_000, 333, -667]]);
-    expect(b.reconciliation).toMatchObject({ status: 'PASS_WITH_EXTERNAL', externalMinor: 1_000, sumGrossNetPositionMinor: -1_000, founderBalanceSumMinor: 0, isBalanced: true });
+    // founder-funded 2,000 split 667/667/666; A paid 2,000 net of reimbursement
+    expect(b.positions.slice(0, 3).map((p: Record<string, number>) => [p.paidMinor, p.fairShareMinor, p.grossNetPositionMinor])).toEqual([[2_000, 667, 1_333], [0, 667, -667], [0, 666, -666]]);
+    expect(b.reconciliation).toMatchObject({ status: 'PASS', businessBorneMinor: 1_000, sumGrossNetPositionMinor: 0, isBalanced: true });
     expect(b.reconciliation.checks.every((c: { ok: boolean }) => c.ok)).toBe(true);
     const rec = (await w.b.get('/api/settlements/recommendations')).body;
-    expect(rec.recommendations.map((r: { payer: { name: string }; amountMinor: number }) => [r.payer.name, r.amountMinor])).toEqual([['Founder B', 667], ['Founder C', 667]]);
-    expect(rec.reconciliation.recommendedTotalMinor).toBe(1_334); // founder-to-founder only; the external 1,000 is not in it
+    expect(rec.recommendations.map((r: { payer: { name: string }; amountMinor: number }) => [r.payer.name, r.amountMinor])).toEqual([['Founder B', 667], ['Founder C', 666]]);
+    expect(rec.reconciliation.recommendedTotalMinor).toBe(1_333);
     const sum = (await w.a.get('/api/settlements/summary')).body;
-    expect(sum.totals).toMatchObject({ externalMinor: 1_000, outstandingPayableMinor: 1_334, outstandingReceivableMinor: 1_334 });
+    expect(sum.totals).toMatchObject({ businessBorneMinor: 1_000, outstandingPayableMinor: 1_333, outstandingReceivableMinor: 1_333 });
   });
 
   it('over-settlement is surfaced through the API, not hidden', async () => {

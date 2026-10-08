@@ -1,3 +1,4 @@
+import { Types } from 'mongoose';
 import request from 'supertest';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { createApp } from '../src/app';
@@ -36,8 +37,14 @@ describe('creating every transaction type', () => {
   it('3. Founder Loan', async () => {
     expect((await w.a.post('/api/transactions').send(base({ type: 'founder_loan', paidByFounderId: w.f.b }))).status).toBe(201);
   });
-  it('4. Reimbursement', async () => {
-    expect((await w.a.post('/api/transactions').send(base({ type: 'reimbursement', paidByFounderId: w.f.c }))).status).toBe(201);
+  it('4. Reimbursement (Option C: linked to the approved expense it reimburses)', async () => {
+    const exp = await w.a.post('/api/transactions').send(expensePayload(w, { paidByFounderId: w.f.c }));
+    expect(exp.status).toBe(201);
+    await Transaction.collection.updateOne({ _id: new Types.ObjectId(exp.body.transaction.id) }, { $set: { status: 'approved' } });
+    const res = await w.a.post('/api/transactions').send(base({ type: 'reimbursement', paidByFounderId: w.f.c, reimbursesTransactionId: exp.body.transaction.id }));
+    expect(res.status).toBe(201);
+    expect(res.body.transaction.reimbursesTransaction).toMatchObject({ id: exp.body.transaction.id, amountMinor: 3_000_000 });
+    expect((await w.a.post('/api/transactions').send(base({ type: 'reimbursement', paidByFounderId: w.f.c }))).status).toBe(400); // link is mandatory
   });
   it('5. Settlement (payer -> receiver)', async () => {
     const res = await w.a.post('/api/transactions').send(base({ type: 'settlement', paidByFounderId: w.f.a, counterpartyFounderId: w.f.b }));

@@ -36,20 +36,23 @@ export interface TypeRule {
   notes: Need;
   /** Settlement payment method (e.g. bank transfer, UPI, cash). Free text, optional. */
   method: Need;
+  /** Reimbursement only: the expense it reimburses (`reimbursesTransactionId`). Option C. */
+  linkedExpense: Need;
 }
 
 export const RULES: Record<TransactionType, TypeRule> = {
-  business_expense:     { category: 'required', paidBy: 'required', counterparty: 'forbidden', split: 'required',  notes: 'optional', method: 'forbidden' },
-  founder_contribution: { category: 'optional', paidBy: 'required', counterparty: 'forbidden', split: 'forbidden', notes: 'optional', method: 'forbidden' },
-  founder_loan:         { category: 'optional', paidBy: 'required', counterparty: 'forbidden', split: 'forbidden', notes: 'optional', method: 'forbidden' },
+  business_expense:     { category: 'required', paidBy: 'required', counterparty: 'forbidden', split: 'required',  notes: 'optional', method: 'forbidden', linkedExpense: 'forbidden' },
+  founder_contribution: { category: 'optional', paidBy: 'required', counterparty: 'forbidden', split: 'forbidden', notes: 'optional', method: 'forbidden', linkedExpense: 'forbidden' },
+  founder_loan:         { category: 'optional', paidBy: 'required', counterparty: 'forbidden', split: 'forbidden', notes: 'optional', method: 'forbidden', linkedExpense: 'forbidden' },
   // paidBy = the founder being reimbursed (who paid a business expense personally)
-  reimbursement:        { category: 'optional', paidBy: 'required', counterparty: 'forbidden', split: 'forbidden', notes: 'optional', method: 'forbidden' },
+  // paidBy = the founder being reimbursed; MUST be the founder who paid the linked expense. The reimbursed portion is business-borne.
+  reimbursement:        { category: 'optional', paidBy: 'required', counterparty: 'forbidden', split: 'forbidden', notes: 'optional', method: 'forbidden', linkedExpense: 'required' },
   // paidBy = paying founder, counterparty = receiving founder
-  settlement:           { category: 'optional', paidBy: 'required', counterparty: 'required',  split: 'forbidden', notes: 'optional', method: 'optional' },
+  settlement:           { category: 'optional', paidBy: 'required', counterparty: 'required',  split: 'forbidden', notes: 'optional', method: 'optional', linkedExpense: 'forbidden' },
   // Phase 3: paidBy = founder who received the returned money; the split says how the refunded cost is shared back.
   // Both are needed to compute fair share / paid, so they are now required (spec: PHASE-3-CALCULATION-SPEC §1).
-  refund:               { category: 'optional', paidBy: 'required', counterparty: 'forbidden', split: 'required',  notes: 'optional', method: 'forbidden' },
-  other:                { category: 'optional', paidBy: 'optional', counterparty: 'forbidden', split: 'optional',  notes: 'required', method: 'forbidden' },
+  refund:               { category: 'optional', paidBy: 'required', counterparty: 'forbidden', split: 'required',  notes: 'optional', method: 'forbidden', linkedExpense: 'forbidden' },
+  other:                { category: 'optional', paidBy: 'optional', counterparty: 'forbidden', split: 'optional',  notes: 'required', method: 'forbidden', linkedExpense: 'forbidden' },
 };
 
 export const TRANSACTION_STATUSES = ['draft', 'pending_approval', 'approved', 'rejected', 'voided'] as const;
@@ -83,6 +86,7 @@ export interface RuleSubject {
   counterpartyFounderId?: string | null;
   notes?: string | null;
   method?: string | null;
+  reimbursesTransactionId?: string | null;
   hasSplit: boolean;
 }
 
@@ -101,6 +105,7 @@ export function checkTypeRules(s: RuleSubject): RuleIssue[] {
   check(r.split, s.hasSplit, 'split', 'A split');
   check(r.notes, !!s.notes?.trim(), 'notes', 'Notes');
   check(r.method, !!s.method?.trim(), 'method', 'Payment method');
+  check(r.linkedExpense, !!s.reimbursesTransactionId, 'reimbursesTransactionId', 'The expense being reimbursed');
   if (s.counterpartyFounderId && s.counterpartyFounderId === s.paidByFounderId) {
     issues.push({ path: 'counterpartyFounderId', code: 'SAME_FOUNDER', message: 'Paying and receiving founder must be different' });
   }

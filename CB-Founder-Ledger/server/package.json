@@ -16,7 +16,9 @@
     "seed:admin": "tsx src/scripts/seedAdmin.ts",
     "seed:admin:prod": "node dist/scripts/seedAdmin.js",
     "seed:dev-categories": "tsx src/scripts/seedDevCategories.ts",
-    "seed:dev-categories:prod": "node dist/scripts/seedDevCategories.js"
+    "seed:dev-categories:prod": "node dist/scripts/seedDevCategories.js",
+    "reconcile:reimbursements": "tsx src/scripts/reconcileReimbursements.ts",
+    "reconcile:reimbursements:prod": "node dist/scripts/reconcileReimbursements.js"
   },
   "dependencies": {
     "bcryptjs": "^3.0.3",

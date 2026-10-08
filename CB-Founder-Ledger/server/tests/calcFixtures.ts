@@ -28,7 +28,9 @@ export function expense(amountMinor: number, paidBy: string, split: SplitInput, 
 export function refund(amountMinor: number, receivedBy: string, split: SplitInput, over: Partial<CalcTransaction> = {}) {
   return tx('refund', amountMinor, { paidByFounderId: receivedBy, split: withSplit(split, amountMinor), ...over });
 }
-export const reimbursement = (amountMinor: number, to: string, over: Partial<CalcTransaction> = {}) => tx('reimbursement', amountMinor, { paidByFounderId: to, ...over });
+/** Option C: a reimbursement is linked to exactly one expense (`expenseId`) and paid to the founder who paid it. */
+export const reimbursement = (amountMinor: number, to: string, expenseId: string | null, over: Partial<CalcTransaction> = {}) =>
+  tx('reimbursement', amountMinor, { paidByFounderId: to, reimbursesTransactionId: expenseId, ...over });
 export const contribution = (amountMinor: number, by: string, over: Partial<CalcTransaction> = {}) => tx('founder_contribution', amountMinor, { paidByFounderId: by, ...over });
 export const loan = (amountMinor: number, by: string, over: Partial<CalcTransaction> = {}) => tx('founder_loan', amountMinor, { paidByFounderId: by, ...over });
 export const settlement = (amountMinor: number, payer: string, receiver: string, over: Partial<CalcTransaction> = {}) => tx('settlement', amountMinor, { paidByFounderId: payer, counterpartyFounderId: receiver, ...over });

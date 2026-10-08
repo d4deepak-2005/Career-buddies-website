@@ -27,7 +27,11 @@ function scenario(seed: number, opts: { reimbursements: boolean }) {
     else if (kind === 'refund') txs.push(refund(money(), who, split()));
     else if (kind === 'contribution') txs.push(contribution(money(), who));
     else if (kind === 'loan') txs.push(loan(money(), who));
-    else if (kind === 'reimb') txs.push(reimbursement(money(), who));
+    else if (kind === 'reimb') {
+      // Option C: link to an earlier expense; payer matches the expense payer; amount sometimes exceeds it (cap exclusion)
+      const exps = txs.filter((x) => x.type === 'business_expense');
+      if (exps.length) { const e = pick(exps); txs.push(reimbursement(1 + Math.floor(rand() * Math.floor(e.amountMinor * 1.2)), e.paidByFounderId!, e.id)); }
+    }
     else { const to = pick(IDS.filter((x) => x !== who)); txs.push(settlement(money(), who, to)); }
   }
   return txs;
@@ -38,7 +42,7 @@ describe('accounting invariants over random scenarios (4 founders, every transac
     for (let s = 1; s <= 300; s++) {
       for (const reimbursements of [false, true]) {
         const r = calculate({ founders: FOUNDERS, transactions: scenario(s + (reimbursements ? 1000 : 0), { reimbursements }) });
-        expect(r.founders.reduce((a, f) => a + f.founderBalanceMinor, 0), `seed ${s} reimb=${reimbursements}`).toBe(0);
+        expect(r.founders.reduce((a, f) => a + f.grossNetPositionMinor, 0), `seed ${s} reimb=${reimbursements}`).toBe(0);
         expect(r.founders.reduce((a, f) => a + f.outstandingMinor, 0)).toBe(0);
         expect(r.reconciliation.isBalanced).toBe(true);
         expect(r.reconciliation.checks.filter((c) => !c.ok)).toEqual([]);
@@ -47,23 +51,23 @@ describe('accounting invariants over random scenarios (4 founders, every transac
     }
   });
 
-  it('A2. external amount: Σ(paid − fair share) = −external = −Σ reimbursed, and the per-founder shares add up to it exactly', () => {
+  it('A2. business-borne amount: Σ net = 0 even with reimbursements, and business-borne = Σ valid reimbursements', () => {
     for (let s = 1001; s <= 1300; s++) {
       const r = calculate({ founders: FOUNDERS, transactions: scenario(s, { reimbursements: true }) });
+      expect(r.founders.reduce((a, f) => a + f.grossNetPositionMinor, 0), `seed ${s}`).toBe(0);
       const reimbursed = r.founders.reduce((a, f) => a + f.reimbursedMinor, 0);
-      expect(r.founders.reduce((a, f) => a + f.grossNetPositionMinor, 0) + reimbursed, `seed ${s}`).toBe(0);
-      expect(r.reconciliation.externalMinor).toBe(reimbursed);
-      expect(r.founders.reduce((a, f) => a + f.businessFundedShareMinor, 0)).toBe(reimbursed);
-      expect(r.founders.every((f) => f.businessFundedShareMinor >= 0)).toBe(true);
+      expect(r.reconciliation.businessBorneMinor).toBe(reimbursed);
+      expect(r.expenses.reduce((a, e) => a + e.reimbursedMinor, 0)).toBe(reimbursed);
+      expect(r.expenses.every((e) => e.reimbursedMinor <= e.amountMinor && e.founderFundedMinor >= 0)).toBe(true);
     }
   });
 
-  it('A3. without reimbursements there is no external amount and net positions themselves sum to 0', () => {
+  it('A3. without reimbursements the business-borne amount is 0', () => {
     for (let s = 1; s <= 200; s++) {
       const r = calculate({ founders: FOUNDERS, transactions: scenario(s, { reimbursements: false }) });
-      expect(r.reconciliation.externalMinor).toBe(0);
+      expect(r.reconciliation.businessBorneMinor).toBe(0);
       expect(r.founders.reduce((a, f) => a + f.grossNetPositionMinor, 0)).toBe(0);
-      expect(r.founders.every((f) => f.businessFundedShareMinor === 0 && f.founderBalanceMinor === f.grossNetPositionMinor)).toBe(true);
+      expect(r.founders.every((f) => f.reimbursedMinor === 0)).toBe(true);
     }
   });
 
@@ -82,13 +86,13 @@ describe('accounting invariants over random scenarios (4 founders, every transac
     }
   });
 
-  it('E. every expense/refund fair-share allocation reconciles to its transaction amount', () => {
+  it('E. every expense share allocation reconciles to the founder-funded amount (amount − linked reimbursements); refunds to their amount', () => {
     for (let s = 1; s <= 100; s++) {
       const txs = scenario(s, { reimbursements: true });
       const r = calculate({ founders: FOUNDERS, transactions: txs });
       for (const t of txs.filter((x) => x.type === 'business_expense' || x.type === 'refund')) {
         const kind = t.type === 'business_expense' ? 'expense_share' : 'refund_share';
-        expect(r.effects.filter((e) => e.transactionId === t.id && e.kind === kind).reduce((a, e) => a + e.amountMinor, 0), `seed ${s} ${t.id}`).toBe(t.amountMinor);
+        expect(r.effects.filter((e) => e.transactionId === t.id && e.kind === kind).reduce((a, e) => a + e.amountMinor, 0), `seed ${s} ${t.id}`).toBe(t.type === 'business_expense' ? (r.expenses.find((x) => x.expenseId === t.id)?.founderFundedMinor ?? 0) : t.amountMinor);
       }
     }
   });

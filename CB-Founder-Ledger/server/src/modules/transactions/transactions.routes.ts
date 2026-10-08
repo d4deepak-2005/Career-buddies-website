@@ -6,8 +6,9 @@ import { authenticate, requireRole } from '../../middleware/auth';
 import { writeRateLimiter } from '../../middleware/rateLimit';
 import { validate } from '../../middleware/validate';
 import { receiptsRouter } from '../receipts/receipts.routes';
+import { activeLinkedReimbursements, listReimbursableExpenses } from './reimbursements';
 import {
-  contentSchema, createSchema, idParams, listQuerySchema, patchSchema, previewSchema, versionOnlySchema, voidBodySchema,
+  contentSchema, createSchema, idParams, listQuerySchema, patchSchema, previewSchema, reimbursableQuerySchema, versionOnlySchema, voidBodySchema,
   type TransactionContent,
 } from './transactions.schemas';
 import * as svc from './transactions.service';
@@ -40,6 +41,12 @@ transactionsRouter.post('/split-preview', validate(previewSchema), asyncHandler(
   res.json(await svc.previewSplit(req.body as z.infer<typeof previewSchema>));
 }));
 
+// Option C: eligible expenses (approved, paid by this founder, still reimbursable) for the reimbursement picker.
+transactionsRouter.get('/reimbursable-expenses', validate(reimbursableQuerySchema, 'query'), asyncHandler(async (req, res) => {
+  const q = req.query as unknown as z.infer<typeof reimbursableQuerySchema>;
+  res.json({ expenses: await listReimbursableExpenses(q.paidByFounderId, q.forReimbursementId) });
+}));
+
 transactionsRouter.post('/', limitWrites, validate(createSchema), asyncHandler(async (req, res) => {
   const { status, ...content } = req.body as z.infer<typeof createSchema>;
   const tx = await svc.createTransaction(content, status, req.auth!);
@@ -48,7 +55,10 @@ transactionsRouter.post('/', limitWrites, validate(createSchema), asyncHandler(a
 
 transactionsRouter.get('/:id', validate(idParams, 'params'), asyncHandler(async (req, res) => {
   const transaction = await one((req.params as { id: string }).id);
-  res.json({ transaction, receipts: await svc.receiptsFor(transaction!.id) });
+  const linked = transaction!.type === 'business_expense'
+    ? (await activeLinkedReimbursements(transaction!.id)).map((r) => ({ id: String(r._id), txnNumber: r.txnNumber, amountMinor: r.amountMinor, status: r.status, transactionDate: r.transactionDate.toISOString().slice(0, 10) }))
+    : [];
+  res.json({ transaction, receipts: await svc.receiptsFor(transaction!.id), linkedReimbursements: linked });
 }));
 
 transactionsRouter.get('/:id/split', validate(idParams, 'params'), asyncHandler(async (req, res) => {
