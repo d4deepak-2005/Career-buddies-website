@@ -1,8 +1,8 @@
-import { ArrowDownLeft, ArrowUpRight, CheckCircle2 } from 'lucide-react';
+import { AlertTriangle, ArrowDownLeft, ArrowUpRight, CheckCircle2, Info } from 'lucide-react';
 import { ErrorBox } from '../../components/ui';
-import type { Reconciliation, CalcWarning, PositionAction } from '../../lib/types';
 import type { CurrencyConfig } from '../../lib/money';
 import { formatMinor } from '../../lib/money';
+import type { CalcWarning, PositionAction, Reconciliation } from '../../lib/types';
 
 const ACTION: Record<PositionAction, { label: string; cls: string; Icon: typeof ArrowDownLeft }> = {
   receive: { label: 'To receive', cls: 'bg-cb-green/10 text-cb-green-dark', Icon: ArrowDownLeft },
@@ -26,16 +26,39 @@ export function Stat({ label, value, tone, hint }: { label: string; value: strin
   );
 }
 
-export function CalcNotes({ reconciliation, warnings, excludedPending, currency }: { reconciliation: Reconciliation; warnings: CalcWarning[]; excludedPending?: number; currency: CurrencyConfig }) {
+const STATUS_TEXT: Record<Reconciliation['status'], string> = {
+  PASS: 'Balanced',
+  PASS_WITH_EXTERNAL: 'Balanced, with an external amount',
+  REVIEW: 'Needs review',
+  FAIL: 'Error — figures may be wrong',
+};
+
+/** States the reconciliation result in words. The external (business-funded) amount is named, not folded into founders' balances. */
+export function ReconciliationNote({ reconciliation, currency }: { reconciliation: Reconciliation; currency: CurrencyConfig }) {
+  const r = reconciliation;
+  const Icon = r.status === 'PASS' || r.status === 'PASS_WITH_EXTERNAL' ? CheckCircle2 : AlertTriangle;
   return (
-    <div className="space-y-2">
-      {excludedPending ? <p className="rounded-xl bg-cb-blue/5 px-4 py-3 text-sm text-cb-navy">{excludedPending} transaction{excludedPending === 1 ? ' is' : 's are'} not counted yet because {excludedPending === 1 ? 'it has' : 'they have'} not been approved.</p> : null}
-      {!reconciliation.isBalanced && (
-        <p className="rounded-xl bg-surface-alt px-4 py-3 text-sm text-ink-muted">
-          {formatMinor(Math.abs(reconciliation.unallocatedMinor), currency)} {reconciliation.unallocatedMinor < 0 ? 'was paid out of business funds (reimbursements), so it is not owed to any single founder.' : 'is unallocated.'}
+    <div className="rounded-xl border border-surface-line bg-white px-4 py-3 text-sm" aria-label="Reconciliation">
+      <p className="flex items-center gap-2 font-semibold text-cb-navy"><Icon className="h-4 w-4 shrink-0" aria-hidden />Reconciliation: {STATUS_TEXT[r.status]}</p>
+      {r.externalMinor > 0 && (
+        <p className="mt-1 text-ink-muted">
+          <strong className="text-cb-navy">{formatMinor(r.externalMinor, currency)} external</strong> — paid from business funds (reimbursements). It is shown separately and is never owed to, or by, a founder.
         </p>
       )}
-      {warnings.length > 0 && <ErrorBox error={`${warnings.length} approved record${warnings.length === 1 ? ' was' : 's were'} left out of the figures because the data is incomplete: ${[...new Set(warnings.map((w) => w.message))].join('; ')}.`} />}
+      {r.status === 'FAIL' && <p className="mt-1 text-danger">{r.explanation}</p>}
+    </div>
+  );
+}
+
+export function CalcNotes({ reconciliation, warnings, excludedPending, currency }: { reconciliation: Reconciliation; warnings: CalcWarning[]; excludedPending?: number; currency: CurrencyConfig }) {
+  const attention = [...new Set(warnings.filter((w) => w.level === 'warning').map((w) => w.message))];
+  const notCalculated = warnings.filter((w) => w.code === 'OTHER_NOT_CALCULATED').length;
+  return (
+    <div className="space-y-2">
+      <ReconciliationNote reconciliation={reconciliation} currency={currency} />
+      {excludedPending ? <p className="flex items-start gap-2 rounded-xl bg-cb-blue/5 px-4 py-3 text-sm text-cb-navy"><Info className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />{excludedPending} transaction{excludedPending === 1 ? ' is' : 's are'} not counted yet because {excludedPending === 1 ? 'it has' : 'they have'} not been approved.</p> : null}
+      {notCalculated > 0 && <p className="flex items-start gap-2 rounded-xl bg-surface-alt px-4 py-3 text-sm text-ink-muted"><Info className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />{notCalculated} “Other” transaction{notCalculated === 1 ? ' is' : 's are'} not included in any figure, because the Product Plan does not say how to account for them.</p>}
+      {attention.length > 0 && <ErrorBox error={`Needs attention: ${attention.join('; ')}.`} />}
     </div>
   );
 }

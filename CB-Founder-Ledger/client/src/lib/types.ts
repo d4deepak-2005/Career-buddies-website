@@ -37,15 +37,18 @@ export interface FounderPosition {
   founderId: string; founderName: string; active: boolean;
   expensePaidMinor: number; refundReceivedMinor: number; reimbursedMinor: number; paidMinor: number;
   contributionMinor: number; loanOutstandingMinor: number; fairShareMinor: number; grossNetPositionMinor: number;
+  businessFundedShareMinor: number; founderBalanceMinor: number; overSettledMinor: number;
   settledPaidMinor: number; settledReceivedMinor: number; outstandingMinor: number;
   outstandingReceivableMinor: number; outstandingPayableMinor: number;
   action: PositionAction; settlementStatus: 'settled' | 'partially_settled' | 'open';
 }
+export type ReconciliationStatus = 'PASS' | 'PASS_WITH_EXTERNAL' | 'REVIEW' | 'FAIL';
 export interface Reconciliation {
-  totalPaidMinor: number; totalFairShareMinor: number; unallocatedMinor: number; totalReceivableMinor: number; totalPayableMinor: number;
-  recommendedTotalMinor: number; unresolvedPayableMinor: number; unresolvedReceivableMinor: number; isBalanced: boolean;
+  status: ReconciliationStatus; explanation: string; checks: Array<{ code: string; ok: boolean; detail: string }>;
+  totalPaidMinor: number; totalFairShareMinor: number; sumGrossNetPositionMinor: number; externalMinor: number; founderBalanceSumMinor: number;
+  totalReceivableMinor: number; totalPayableMinor: number; recommendedTotalMinor: number; unresolvedPayableMinor: number; unresolvedReceivableMinor: number; isBalanced: boolean;
 }
-export interface CalcWarning { code: string; transactionId: string; message: string }
+export interface CalcWarning { code: string; level: 'warning' | 'info'; transactionId: string | null; founderId?: string | null; message: string }
 export interface PositionsResponse {
   calculatedAt: string; currency: { code: string; minorUnits: number }; positions: FounderPosition[]; reconciliation: Reconciliation;
   included: Record<string, number>; excluded: { byStatus: Record<string, number>; unclassifiedOther: number; invalid: number }; warnings: CalcWarning[];
@@ -61,7 +64,7 @@ export interface RecommendationsResponse {
 }
 export interface SettlementSummaryResponse {
   calculatedAt: string;
-  totals: { settledMinor: number; outstandingPayableMinor: number; outstandingReceivableMinor: number; recommendedTransfersMinor: number };
+  totals: { settledMinor: number; outstandingPayableMinor: number; outstandingReceivableMinor: number; recommendedTransfersMinor: number; externalMinor: number };
   counts: { official: number; awaitingApproval: number; voidedOrRejected: number; recommendedTransfers: number };
   history: Array<{ id: string; txnNumber: string; transactionDate: string; status: TransactionStatus; payer: Named | null; receiver: Named | null; amountMinor: number; method: string | null; counted: boolean }>;
   reconciliation: Reconciliation; warnings: CalcWarning[];

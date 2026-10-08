@@ -62,7 +62,7 @@ describe('contribution, loan, reimbursement, refund (items 12-15)', () => {
   it('13. loan principal is a separate metric and never enters fair share, paid or net', () => {
     const r = run(three, [loan(2_000_000, 'C')]);
     expect(pos(r, 'C')).toMatchObject({ loanOutstandingMinor: 2_000_000, fairShareMinor: 0, paidMinor: 0, grossNetPositionMinor: 0 });
-    expect(r.reconciliation.unallocatedMinor).toBe(0);
+    expect(r.reconciliation).toMatchObject({ sumGrossNetPositionMinor: 0, externalMinor: 0, status: 'PASS' });
   });
   it('14. reimbursement does not double-count the expense (fair share unchanged, paid offset once)', () => {
     const exp = expense(3_000, 'A', equal(['A', 'B', 'C']));
@@ -71,8 +71,8 @@ describe('contribution, loan, reimbursement, refund (items 12-15)', () => {
     expect(shares(reimb)).toEqual(shares(base)); // not counted as a second expense
     expect(pos(reimb, 'A')).toMatchObject({ expensePaidMinor: 3_000, reimbursedMinor: 3_000, paidMinor: 0 });
     expect(reimb.reconciliation.totalFairShareMinor).toBe(3_000); // 3,000 once, not 6,000
-    // reimbursement is business-funded: founders together sit at −3,000 and that is reported, not hidden
-    expect(reimb.reconciliation.unallocatedMinor).toBe(-3_000);
+    // reimbursement is business-funded: the 3,000 is reported as EXTERNAL, not hidden and not owed between founders
+    expect(reimb.reconciliation).toMatchObject({ externalMinor: 3_000, sumGrossNetPositionMinor: -3_000, founderBalanceSumMinor: 0 });
     const partial = run(three, [exp, reimbursement(1_000, 'A')]);
     expect(pos(partial, 'A').paidMinor).toBe(2_000);
     expect(partial.reconciliation.totalFairShareMinor).toBe(3_000);
@@ -84,7 +84,7 @@ describe('contribution, loan, reimbursement, refund (items 12-15)', () => {
     const partial = run(three, [exp, refund(900, 'A', equal(['A', 'B', 'C']))]);
     expect(shares(partial)).toEqual([700, 700, 700]);
     expect(pos(partial, 'A').paidMinor).toBe(2_100);
-    expect(partial.reconciliation.unallocatedMinor).toBe(0);
+    expect(partial.reconciliation.sumGrossNetPositionMinor).toBe(0);
     expect(partial.reconciliation.totalFairShareMinor).toBe(2_100);
   });
   it('15b. a refund with no stored split is excluded with a warning, never guessed', () => {
@@ -187,10 +187,11 @@ describe('recommendations from the engine (items 21-23)', () => {
     expect(after.founders.every((f) => f.outstandingMinor === 0)).toBe(true);
     expect(after.recommendations).toEqual([]);
   });
-  it('business-funded reimbursement leaves an unresolved amount instead of inventing a receiver', () => {
+  it('a business-funded reimbursement is external: it is never recommended as a founder-to-founder payment', () => {
     const r = run(three, [expense(3_000, 'A', equal(['A', 'B', 'C'])), reimbursement(3_000, 'A')]);
     expect(r.recommendations).toEqual([]);
-    expect(r.reconciliation).toMatchObject({ unallocatedMinor: -3_000, unresolvedPayableMinor: 3_000, unresolvedReceivableMinor: 0, isBalanced: false });
+    expect(r.founders.every((f) => f.action === 'settled' && f.outstandingMinor === 0)).toBe(true);
+    expect(r.reconciliation).toMatchObject({ externalMinor: 3_000, unresolvedPayableMinor: 0, unresolvedReceivableMinor: 0, isBalanced: true, status: 'PASS_WITH_EXTERNAL' });
   });
 });
 
@@ -198,7 +199,7 @@ describe('rounding (item 24)', () => {
   it.each([[1], [2], [10], [100], [101], [99_999]])('amount %i split 3 ways reconciles exactly', (amount) => {
     const r = run(three, [expense(amount, 'A', equal(['A', 'B', 'C']))]);
     expect(r.reconciliation.totalFairShareMinor).toBe(amount);
-    expect(r.reconciliation.unallocatedMinor).toBe(0);
+    expect(r.reconciliation.sumGrossNetPositionMinor).toBe(0);
     expect(shares(r).reduce((a, b) => a + b, 0)).toBe(amount);
   });
   it('4 founders and percentage fractions reconcile', () => {
@@ -210,7 +211,7 @@ describe('rounding (item 24)', () => {
     ]);
     expect(r.reconciliation.totalFairShareMinor).toBe(1_001 + 10_000 + 7);
     expect(r.reconciliation.totalPaidMinor).toBe(1_001 + 10_000 + 7);
-    expect(r.reconciliation.unallocatedMinor).toBe(0);
+    expect(r.reconciliation.sumGrossNetPositionMinor).toBe(0);
   });
 });
 
@@ -234,7 +235,7 @@ describe('founder counts, breadth, freshness (items 25-30, 34-36)', () => {
     const e2 = { ...expense(2_000, 'B', equal(['A', 'B', 'C'])), ...mk('c2', '2026-02-15') };
     const e3 = { ...expense(500, 'C', equal(['A', 'B'])), ...mk('c3', '2025-12-31') };
     const r = run(three, [e1, e2, e3]);
-    expect(r.reconciliation).toMatchObject({ totalPaidMinor: 3_500, totalFairShareMinor: 3_500, unallocatedMinor: 0 });
+    expect(r.reconciliation).toMatchObject({ totalPaidMinor: 3_500, totalFairShareMinor: 3_500, sumGrossNetPositionMinor: 0 });
     expect(pos(r, 'A').paidMinor).toBe(1_000);
     expect(pos(r, 'B').paidMinor).toBe(2_000);
     expect(pos(r, 'A').fairShareMinor).toBe(334 + 667 + 250) // remainder units go to the earliest entries (Phase 2 rule);
@@ -252,7 +253,7 @@ describe('founder counts, breadth, freshness (items 25-30, 34-36)', () => {
     const big = 900_000_000_000;
     const r = run(three, [expense(big, 'A', equal(['A', 'B', 'C'])), expense(big + 1, 'B', equal(['A', 'B', 'C']))]);
     expect(r.reconciliation.totalPaidMinor).toBe(big * 2 + 1);
-    expect(r.reconciliation.unallocatedMinor).toBe(0);
+    expect(r.reconciliation.sumGrossNetPositionMinor).toBe(0);
     const huge = Number.MAX_SAFE_INTEGER - 5;
     const mk = (id: string) => ({ id, type: 'founder_contribution' as const, status: 'approved' as const, amountMinor: huge, paidByFounderId: 'A' });
     expect(() => run(three, [mk('x'), mk('y')])).toThrow(RangeError);

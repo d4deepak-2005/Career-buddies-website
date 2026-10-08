@@ -33,13 +33,15 @@ export function FounderLedgerPage() {
         </div>
         <dl className="mt-5 grid grid-cols-2 gap-x-4 gap-y-4 sm:grid-cols-3">
           <Stat label="Total paid" value={m(p.paidMinor)} />
-          <Stat label="Contribution" value={m(p.contributionMinor)} />
+          <Stat label="Contribution" value={m(p.contributionMinor)} hint="Capital, tracked separately" />
           <Stat label="Loan outstanding" value={m(p.loanOutstandingMinor)} />
           <Stat label="Fair share" value={m(p.fairShareMinor)} />
-          <Stat label="Net position" value={formatSignedMinor(p.grossNetPositionMinor, cfg.currency)} tone={p.grossNetPositionMinor > 0 ? 'receive' : p.grossNetPositionMinor < 0 ? 'pay' : undefined} />
+          <Stat label="Net position" value={formatSignedMinor(p.grossNetPositionMinor, cfg.currency)} tone={p.grossNetPositionMinor > 0 ? 'receive' : p.grossNetPositionMinor < 0 ? 'pay' : undefined} hint="Paid − fair share" />
+          {p.businessFundedShareMinor > 0 && <Stat label="Business-funded share" value={m(p.businessFundedShareMinor)} hint="External: paid from business funds, not owed to a founder" />}
           <Stat label="Settled so far" value={`${m(p.settledPaidMinor)} paid · ${m(p.settledReceivedMinor)} received`} />
           <Stat label="Amount receivable" value={m(p.outstandingReceivableMinor)} tone={p.outstandingReceivableMinor > 0 ? 'receive' : undefined} />
           <Stat label="Amount payable" value={m(p.outstandingPayableMinor)} tone={p.outstandingPayableMinor > 0 ? 'pay' : undefined} />
+          {p.overSettledMinor > 0 && <Stat label="Over-settled by" value={m(p.overSettledMinor)} tone="pay" hint="Paid or received more than was due" />}
           <Stat label="Outstanding" value={formatSignedMinor(p.outstandingMinor, cfg.currency)} tone={p.outstandingMinor > 0 ? 'receive' : p.outstandingMinor < 0 ? 'pay' : undefined} />
         </dl>
       </section>

@@ -33,24 +33,43 @@ function scenario(seed: number, opts: { reimbursements: boolean }) {
   return txs;
 }
 
-describe('accounting invariants over 600 random scenarios (4 founders, all transaction types)', () => {
-  it('A. sum of net positions = 0 without reimbursements; = −Σ reimbursed with them (documented exception)', () => {
+describe('accounting invariants over random scenarios (4 founders, every transaction type incl. reimbursements)', () => {
+  it('A1. founder-to-founder balances sum to exactly 0 in EVERY scenario, reimbursements included (no weakened invariant)', () => {
     for (let s = 1; s <= 300; s++) {
-      const txs = scenario(s, { reimbursements: false });
-      const r = calculate({ founders: FOUNDERS, transactions: txs });
-      expect(r.founders.reduce((a, f) => a + f.grossNetPositionMinor, 0), `seed ${s}`).toBe(0);
-      expect(r.founders.reduce((a, f) => a + f.outstandingMinor, 0)).toBe(0);
-      expect(r.reconciliation.isBalanced).toBe(true);
-    }
-    for (let s = 1001; s <= 1300; s++) {
-      const r = calculate({ founders: FOUNDERS, transactions: scenario(s, { reimbursements: true }) });
-      expect(r.founders.reduce((a, f) => a + f.grossNetPositionMinor, 0) + r.founders.reduce((a, f) => a + f.reimbursedMinor, 0), `seed ${s}`).toBe(0);
+      for (const reimbursements of [false, true]) {
+        const r = calculate({ founders: FOUNDERS, transactions: scenario(s + (reimbursements ? 1000 : 0), { reimbursements }) });
+        expect(r.founders.reduce((a, f) => a + f.founderBalanceMinor, 0), `seed ${s} reimb=${reimbursements}`).toBe(0);
+        expect(r.founders.reduce((a, f) => a + f.outstandingMinor, 0)).toBe(0);
+        expect(r.reconciliation.isBalanced).toBe(true);
+        expect(r.reconciliation.checks.filter((c) => !c.ok)).toEqual([]);
+        expect(r.reconciliation.status).not.toBe('FAIL');
+      }
     }
   });
 
-  it('B-D. payable = receivable when balanced; recommendations never exceed payer/receiver positions; no money created or lost', () => {
-    for (let s = 1; s <= 300; s++) {
+  it('A2. external amount: Σ(paid − fair share) = −external = −Σ reimbursed, and the per-founder shares add up to it exactly', () => {
+    for (let s = 1001; s <= 1300; s++) {
+      const r = calculate({ founders: FOUNDERS, transactions: scenario(s, { reimbursements: true }) });
+      const reimbursed = r.founders.reduce((a, f) => a + f.reimbursedMinor, 0);
+      expect(r.founders.reduce((a, f) => a + f.grossNetPositionMinor, 0) + reimbursed, `seed ${s}`).toBe(0);
+      expect(r.reconciliation.externalMinor).toBe(reimbursed);
+      expect(r.founders.reduce((a, f) => a + f.businessFundedShareMinor, 0)).toBe(reimbursed);
+      expect(r.founders.every((f) => f.businessFundedShareMinor >= 0)).toBe(true);
+    }
+  });
+
+  it('A3. without reimbursements there is no external amount and net positions themselves sum to 0', () => {
+    for (let s = 1; s <= 200; s++) {
       const r = calculate({ founders: FOUNDERS, transactions: scenario(s, { reimbursements: false }) });
+      expect(r.reconciliation.externalMinor).toBe(0);
+      expect(r.founders.reduce((a, f) => a + f.grossNetPositionMinor, 0)).toBe(0);
+      expect(r.founders.every((f) => f.businessFundedShareMinor === 0 && f.founderBalanceMinor === f.grossNetPositionMinor)).toBe(true);
+    }
+  });
+
+  it('B-D. payable = receivable; recommendations never exceed payer/receiver positions; no money created or lost (all scenarios)', () => {
+    for (let s = 1; s <= 300; s++) {
+      const r = calculate({ founders: FOUNDERS, transactions: scenario(s + 5000, { reimbursements: true }) });
       expect(r.reconciliation.totalPayableMinor, `seed ${s}`).toBe(r.reconciliation.totalReceivableMinor);
       expect(r.reconciliation.recommendedTotalMinor).toBe(r.reconciliation.totalPayableMinor);
       const out = new Map<string, number>(), inn = new Map<string, number>();
@@ -88,7 +107,7 @@ describe('accounting invariants over 600 random scenarios (4 founders, all trans
 
   it('applying the recommendations as official settlements always fully settles a balanced ledger', () => {
     for (let s = 1; s <= 100; s++) {
-      const txs = scenario(s, { reimbursements: false });
+      const txs = scenario(s, { reimbursements: true });
       const first = calculate({ founders: FOUNDERS, transactions: txs });
       const paid = first.recommendations.map((x) => settlement(x.amountMinor, x.payerFounderId, x.receiverFounderId));
       const after = calculate({ founders: FOUNDERS, transactions: [...txs, ...paid] });

@@ -99,6 +99,8 @@ export function settlementSummary(l: Loaded) {
       outstandingPayableMinor: r.totalPayableMinor,
       outstandingReceivableMinor: r.totalReceivableMinor,
       recommendedTransfersMinor: r.recommendedTotalMinor,
+      /** Paid from business funds (reimbursements). Shown separately; never part of a founder-to-founder payment. */
+      externalMinor: r.externalMinor,
     },
     counts: {
       official: official.size,

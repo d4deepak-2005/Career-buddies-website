@@ -7,9 +7,12 @@ const me = { 'GET /auth/me': { status: 200, body: { user: founderUser } } };
 const currency = { code: 'INR', minorUnits: 2 };
 const zero: Omit<FounderPosition, 'founderId' | 'founderName'> = {
   active: true, expensePaidMinor: 0, refundReceivedMinor: 0, reimbursedMinor: 0, paidMinor: 0, contributionMinor: 0, loanOutstandingMinor: 0, fairShareMinor: 0,
-  grossNetPositionMinor: 0, settledPaidMinor: 0, settledReceivedMinor: 0, outstandingMinor: 0, outstandingReceivableMinor: 0, outstandingPayableMinor: 0, action: 'settled', settlementStatus: 'settled',
+  grossNetPositionMinor: 0, businessFundedShareMinor: 0, founderBalanceMinor: 0, overSettledMinor: 0, settledPaidMinor: 0, settledReceivedMinor: 0, outstandingMinor: 0, outstandingReceivableMinor: 0, outstandingPayableMinor: 0, action: 'settled', settlementStatus: 'settled',
 };
-const balanced: Reconciliation = { totalPaidMinor: 0, totalFairShareMinor: 0, unallocatedMinor: 0, totalReceivableMinor: 0, totalPayableMinor: 0, recommendedTotalMinor: 0, unresolvedPayableMinor: 0, unresolvedReceivableMinor: 0, isBalanced: true };
+const balanced: Reconciliation = {
+  status: 'PASS', explanation: 'Balances reconcile', checks: [], totalPaidMinor: 0, totalFairShareMinor: 0, sumGrossNetPositionMinor: 0, externalMinor: 0, founderBalanceSumMinor: 0,
+  totalReceivableMinor: 0, totalPayableMinor: 0, recommendedTotalMinor: 0, unresolvedPayableMinor: 0, unresolvedReceivableMinor: 0, isBalanced: true,
+};
 const excluded = { byStatus: {}, unclassifiedOther: 0, invalid: 0 };
 
 const positions: FounderPosition[] = [
@@ -49,14 +52,56 @@ describe('founders page shows server-calculated positions', () => {
     expect(within(card).queryByText(/1,000\.00/)).not.toBeInTheDocument();
   });
 
-  it('explains what is not counted: awaiting approval, business-funded amounts, incomplete records', async () => {
+  it('explains what is not counted: awaiting approval, "Other", incomplete records — and states the reconciliation in words', async () => {
     mockFetch({ ...me, 'GET /founders/financial-positions': { status: 200, body: {
-      calculatedAt: 'x', currency, positions, included: {}, excluded: { byStatus: { pending_approval: 2, draft: 1 }, unclassifiedOther: 0, invalid: 1 },
-      reconciliation: { ...balanced, isBalanced: false, unallocatedMinor: -300_000 }, warnings: [{ code: 'MISSING_SPLIT', transactionId: 't', message: 'refund has no stored split' }] } } });
+      calculatedAt: 'x', currency, positions, included: {}, excluded: { byStatus: { pending_approval: 2, draft: 1 }, unclassifiedOther: 1, invalid: 1 },
+      reconciliation: { ...balanced, status: 'REVIEW' },
+      warnings: [
+        { code: 'MISSING_SPLIT', level: 'warning', transactionId: 't', message: 'refund has no stored split' },
+        { code: 'OTHER_NOT_CALCULATED', level: 'info', transactionId: 'o', message: 'An "Other" transaction is not included in any calculation' },
+      ] } } });
     renderApp('/founders');
     expect(await screen.findByText(/3 transactions are not counted yet/)).toBeInTheDocument();
-    expect(screen.getByText(/3,000\.00 was paid out of business funds/)).toBeInTheDocument();
-    expect(screen.getByRole('alert')).toHaveTextContent(/refund has no stored split/);
+    expect(screen.getByText(/1 “Other” transaction is not included in any figure/)).toBeInTheDocument();
+    expect(screen.getByLabelText('Reconciliation')).toHaveTextContent('Reconciliation: Needs review');
+    expect(screen.getByRole('alert')).toHaveTextContent(/Needs attention: refund has no stored split/);
+    expect(screen.getByRole('alert')).not.toHaveTextContent(/Other/); // info diagnostics are not presented as errors
+  });
+
+  it('names the EXTERNAL (business-funded) amount separately; founders are not shown as owing it', async () => {
+    const funded: FounderPosition = { ...zero, founderId: 'f1', founderName: 'Asha', paidMinor: 0, fairShareMinor: 100_000, grossNetPositionMinor: -100_000, businessFundedShareMinor: 100_000, founderBalanceMinor: 0, action: 'settled' };
+    mockFetch({ ...me, 'GET /founders/financial-positions': { status: 200, body: { calculatedAt: 'x', currency, positions: [funded], included: {}, excluded,
+      reconciliation: { ...balanced, status: 'PASS_WITH_EXTERNAL', externalMinor: 100_000, sumGrossNetPositionMinor: -100_000 }, warnings: [] } } });
+    renderApp('/founders');
+    const recon = await screen.findByLabelText('Reconciliation');
+    expect(recon).toHaveTextContent('Reconciliation: Balanced, with an external amount');
+    expect(recon).toHaveTextContent(/1,000\.00 external.*paid from business funds.*never owed to, or by, a founder/);
+    const card = screen.getAllByRole('listitem')[0]!;
+    expect(within(card).getByText('Settled')).toBeInTheDocument();                       // action is about founder-to-founder, so settled
+    expect(within(card).getByText('Business-funded share')).toBeInTheDocument();
+    expect(within(card).getByText(/External: paid from business funds/)).toBeInTheDocument();
+    expect(within(card).getByText('Net position').nextSibling).toHaveTextContent(/−.*1,000\.00/);   // honest paid − fair share still shown
+    expect(within(card).getByText('Paid − fair share')).toBeInTheDocument();
+  });
+
+  it('flags over-settlement in words on the card and the ledger', async () => {
+    const over: FounderPosition = { ...zero, founderId: 'f2', founderName: 'Bilal', outstandingMinor: 50_000, outstandingReceivableMinor: 50_000, overSettledMinor: 50_000, action: 'receive', settlementStatus: 'partially_settled' };
+    mockFetch({ ...me,
+      'GET /founders/financial-positions': { status: 200, body: { calculatedAt: 'x', currency, positions: [over], included: {}, excluded, reconciliation: { ...balanced, status: 'REVIEW' }, warnings: [{ code: 'OVER_SETTLED', level: 'warning', transactionId: null, founderId: 'f2', message: 'Settlements moved Bilal past zero (they paid or received more than was due)' }] } },
+      'GET /founders/f2/financial-position': { status: 200, body: { calculatedAt: 'x', position: over, history: [], reconciliation: balanced, warnings: [] } } });
+    renderApp('/founders');
+    expect(await screen.findByText(/Over-settled by .*500\.00: paid or received more than was due/)).toBeInTheDocument();
+    expect(screen.getByRole('alert')).toHaveTextContent(/Settlements moved Bilal past zero/);
+  });
+
+  it('every reconciliation status is spelled out in words (not colour only)', async () => {
+    const texts: Record<string, string> = { PASS: 'Balanced', PASS_WITH_EXTERNAL: 'Balanced, with an external amount', REVIEW: 'Needs review', FAIL: 'Error — figures may be wrong' };
+    for (const [status, text] of Object.entries(texts)) {
+      mockFetch({ ...me, 'GET /founders/financial-positions': { status: 200, body: { calculatedAt: 'x', currency, positions, included: {}, excluded, reconciliation: { ...balanced, status, explanation: 'Internal check failed: X' }, warnings: [] } } });
+      const { unmount } = renderApp('/founders');
+      expect(await screen.findByLabelText('Reconciliation')).toHaveTextContent(`Reconciliation: ${text}`);
+      unmount();
+    }
   });
 
   it('empty state when no founder profiles exist', async () => {
@@ -102,7 +147,7 @@ describe('settlements page', () => {
   const rec = { calculatedAt: 'x', unresolvedPayableMinor: 0, unresolvedReceivableMinor: 0, reconciliation: balanced, recommendations: [
     { payer: { id: 'f2', name: 'Bilal' }, receiver: { id: 'f1', name: 'Asha' }, amountMinor: 666_700 }, { payer: { id: 'f3', name: 'Chen' }, receiver: { id: 'f1', name: 'Asha' }, amountMinor: 1_166_600 }] };
   const summary = { calculatedAt: 'x', warnings: [], reconciliation: balanced,
-    totals: { settledMinor: 100_000, outstandingPayableMinor: 1_833_300, outstandingReceivableMinor: 1_833_300, recommendedTransfersMinor: 1_833_300 },
+    totals: { settledMinor: 100_000, outstandingPayableMinor: 1_833_300, outstandingReceivableMinor: 1_833_300, recommendedTransfersMinor: 1_833_300, externalMinor: 0 },
     counts: { official: 1, awaitingApproval: 1, voidedOrRejected: 0, recommendedTransfers: 2 },
     history: [{ id: 's1', txnNumber: 'TXN-000009', transactionDate: '2026-05-03', status: 'approved', payer: { id: 'f2', name: 'Bilal' }, receiver: { id: 'f1', name: 'Asha' }, amountMinor: 100_000, method: 'UPI', counted: true },
       { id: 's2', txnNumber: 'TXN-000010', transactionDate: '2026-05-04', status: 'pending_approval', payer: { id: 'f3', name: 'Chen' }, receiver: { id: 'f1', name: 'Asha' }, amountMinor: 5_000, method: null, counted: false }] };
@@ -118,6 +163,15 @@ describe('settlements page', () => {
     expect(screen.getByText(/1 settlement is waiting for approval/)).toBeInTheDocument();
     expect(screen.getByText(/UPI/)).toBeInTheDocument();
     expect(screen.getByText(/TXN-000010.*not counted/)).toBeInTheDocument();
+  });
+  it('shows the external amount in the summary, separate from the payments', async () => {
+    mockFetch({ ...me,
+      'GET /settlements/recommendations': { status: 200, body: { ...rec, reconciliation: { ...balanced, status: 'PASS_WITH_EXTERNAL', externalMinor: 300_000 } } },
+      'GET /settlements/summary': { status: 200, body: { ...summary, totals: { ...summary.totals, externalMinor: 300_000 }, reconciliation: { ...balanced, status: 'PASS_WITH_EXTERNAL', externalMinor: 300_000 } } } });
+    renderApp('/settlements');
+    expect(await screen.findByText('Paid from business funds')).toBeInTheDocument();
+    expect(screen.getByText(/External — not part of any payment above/)).toBeInTheDocument();
+    expect(screen.getByLabelText('Reconciliation')).toHaveTextContent(/3,000\.00 external/);
   });
   it('everyone settled -> clear message, no list', async () => {
     mockFetch({ ...me, 'GET /settlements/recommendations': { status: 200, body: { ...rec, recommendations: [] } }, 'GET /settlements/summary': { status: 200, body: { ...summary, history: [], counts: { official: 0, awaitingApproval: 0, voidedOrRejected: 0, recommendedTransfers: 0 } } } });

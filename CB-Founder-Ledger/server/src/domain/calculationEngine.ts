@@ -7,6 +7,7 @@
  * PDF or is an implementation assumption, is documented in docs/PHASE-3-CALCULATION-SPEC.md.
  */
 import { recommendSettlements, type SettlementRecommendation } from './settlementAlgorithm';
+import { allocateByWeights } from './splits';
 import type { TransactionStatus, TransactionType } from './transactionRules';
 
 /** Only approved transactions are official (PDF §11; spec C-2). */
@@ -36,19 +37,30 @@ export interface FounderFinancialPosition {
   expensePaidMinor: number;
   refundReceivedMinor: number;
   reimbursedMinor: number;
-  /** expensePaid − refundReceived − reimbursed */
+  /** expensePaid − refundReceived − reimbursed ("Paid") */
   paidMinor: number;
+  /** Capital put in by the founder. Tracked separately; never part of paid / fair share / net (spec C-6). */
   contributionMinor: number;
+  /** Approved loan principal. Repayment is not modelled (Phase 3 limitation). */
   loanOutstandingMinor: number;
   fairShareMinor: number;
-  /** paid − fairShare (PDF §9) */
+  /** paid − fairShare. Formula INFERRED FROM THE PDF's §9 example. Includes the business-funded effect (see below). */
   grossNetPositionMinor: number;
+  /**
+   * This founder's share of amounts paid from business funds (reimbursements). It is NOT owed to any founder
+   * and is never settled between founders. Zero when there are no reimbursements.
+   */
+  businessFundedShareMinor: number;
+  /** grossNet + businessFundedShare — what the founders owe EACH OTHER before settlements. Sums to 0 across founders. */
+  founderBalanceMinor: number;
   settledPaidMinor: number;
   settledReceivedMinor: number;
-  /** grossNet + settledPaid − settledReceived (signed) */
+  /** founderBalance + settledPaid − settledReceived (signed). Positive = should receive from founders, negative = should pay founders. */
   outstandingMinor: number;
   outstandingReceivableMinor: number;
   outstandingPayableMinor: number;
+  /** Amount by which settlements moved this founder past zero (they paid / received more than was due). 0 when none. */
+  overSettledMinor: number;
   action: PositionAction;
   settlementStatus: SettlementStatus;
 }
@@ -60,18 +72,46 @@ export type EffectKind =
 /** One traceable contribution of one official transaction to one founder's figures. */
 export interface LedgerEffect { founderId: string; transactionId: string; kind: EffectKind; amountMinor: number }
 
-export interface CalcWarning { code: string; transactionId: string; message: string }
+export interface CalcWarning {
+  code: string;
+  /** `warning` = needs attention; `info` = diagnostic only (e.g. an "Other" transaction that is not calculated). */
+  level: 'warning' | 'info';
+  transactionId: string | null;
+  founderId?: string | null;
+  message: string;
+}
+
+export type ReconciliationStatus = 'PASS' | 'PASS_WITH_EXTERNAL' | 'REVIEW' | 'FAIL';
+
+export interface ReconciliationCheck { code: string; ok: boolean; detail: string }
 
 export interface Reconciliation {
+  /**
+   * PASS               — founder balances reconcile, nothing external, no warnings.
+   * PASS_WITH_EXTERNAL — founder balances reconcile; an external (business-funded) amount exists and is explained.
+   * REVIEW             — arithmetic reconciles, but warnings (invalid records, over-settlement, refund/reimbursement anomalies) need attention.
+   * FAIL               — an arithmetic invariant is violated (should never happen; indicates a bug).
+   */
+  status: ReconciliationStatus;
+  explanation: string;
+  checks: ReconciliationCheck[];
+
   totalPaidMinor: number;
   totalFairShareMinor: number;
-  /** Σ grossNet. 0 unless reimbursements exist (they are business-funded, spec C-4); then equals −Σ reimbursed. */
-  unallocatedMinor: number;
+  /** Σ (paid − fairShare). Equals −externalMinor: the ONLY reason it is not 0 is business-funded reimbursements. */
+  sumGrossNetPositionMinor: number;
+  /** Paid from business funds (valid approved reimbursements). External: never owed to / by a founder, never settled between founders. */
+  externalMinor: number;
+  /** Σ founderBalance. Always 0 (founder-to-founder obligations are zero-sum). */
+  founderBalanceSumMinor: number;
+
+  /** Founder-to-founder receivable / payable after settlements (equal when reconciled). */
   totalReceivableMinor: number;
   totalPayableMinor: number;
   recommendedTotalMinor: number;
   unresolvedPayableMinor: number;
   unresolvedReceivableMinor: number;
+  /** True when founder receivables equal founder payables. Independent of any external amount. */
   isBalanced: boolean;
 }
 
@@ -110,7 +150,7 @@ export function calculate(input: { founders: readonly CalcFounder[]; transaction
 
   const reject = (t: CalcTransaction, code: string, message: string) => {
     excluded.invalid += 1;
-    warnings.push({ code, transactionId: t.id, message });
+    warnings.push({ code, level: 'warning', transactionId: t.id, message });
   };
 
   for (const t of input.transactions) {
@@ -118,7 +158,12 @@ export function calculate(input: { founders: readonly CalcFounder[]; transaction
       excluded.byStatus[t.status] = (excluded.byStatus[t.status] ?? 0) + 1;
       continue;
     }
-    if (t.type === 'other') { excluded.unclassifiedOther += 1; continue; }
+    if (t.type === 'other') {
+      // Diagnostic only: counted so it is visible, but its amount is NEVER added to any figure (spec: "Other" has no accounting meaning in the PDF).
+      excluded.unclassifiedOther += 1;
+      warnings.push({ code: 'OTHER_NOT_CALCULATED', level: 'info', transactionId: t.id, message: 'An "Other" transaction is not included in any calculation' });
+      continue;
+    }
     if (!isPositiveMoney(t.amountMinor)) { reject(t, 'INVALID_AMOUNT', 'Amount must be a positive whole number of minor units'); continue; }
 
     const payer = t.paidByFounderId ? t.paidByFounderId : undefined;
@@ -185,46 +230,104 @@ export function calculate(input: { founders: readonly CalcFounder[]; transaction
     }
   }
 
-  const founders: FounderFinancialPosition[] = input.founders.map((f) => {
+  // ---- Layer 1: what each founder paid and is responsible for (PDF §9: net = paid − fair share, inferred from the example).
+  const base = input.founders.map((f) => {
     const a = acc.get(f.id)!;
     const paid = a.expensePaid - a.refundReceived - a.reimbursed;
     const fair = a.expenseShare - a.refundShare;
-    const gross = paid - fair;
-    const outstanding = gross + a.settledPaid - a.settledReceived;
+    return { f, a, paid, fair, gross: paid - fair };
+  });
+
+  // ---- Layer 2: split out the business-funded (external) amount so founder-to-founder balances stay zero-sum.
+  // Reimbursements come from business money, not from another founder, so founders owe nothing TO EACH OTHER for them.
+  // The business-funded total R is attributed to founders in proportion to their fair share (largest-remainder rounding,
+  // same helper as Phase 2). Fallbacks: no positive fair shares -> attribute to the reimbursed founders themselves.
+  // IMPLEMENTATION ASSUMPTION — see docs/PHASE-3-CALCULATION-SPEC.md §6.
+  const externalTotal = base.reduce((s2, b) => add(s2, b.a.reimbursed), 0);
+  const externalShare = new Map<string, number>(base.map((b) => [b.f.id, 0]));
+  if (externalTotal > 0) {
+    let weighted = base.filter((b) => b.fair > 0).map((b) => ({ id: b.f.id, w: b.fair }));
+    if (weighted.length === 0) weighted = base.filter((b) => b.a.reimbursed > 0).map((b) => ({ id: b.f.id, w: b.a.reimbursed }));
+    const parts = allocateByWeights(externalTotal, weighted.map((x) => x.w));
+    weighted.forEach((x, i) => externalShare.set(x.id, parts[i] ?? 0));
+  }
+
+  const founders: FounderFinancialPosition[] = base.map(({ f, a, paid, fair, gross }) => {
+    const share = externalShare.get(f.id) ?? 0;
+    const founderBalance = gross + share;
+    const outstanding = founderBalance + a.settledPaid - a.settledReceived;
     const activity = a.settledPaid + a.settledReceived > 0;
+    // Over-settlement: settlements pushed the founder past zero (paid or received more than was due).
+    const overSettled = founderBalance > 0 && outstanding < 0 ? -outstanding : founderBalance < 0 && outstanding > 0 ? outstanding : founderBalance === 0 ? Math.abs(outstanding) : 0;
     return {
       founderId: f.id, founderName: f.name, active: f.active,
       expensePaidMinor: a.expensePaid, refundReceivedMinor: a.refundReceived, reimbursedMinor: a.reimbursed,
       paidMinor: paid, contributionMinor: a.contribution, loanOutstandingMinor: a.loan,
       fairShareMinor: fair, grossNetPositionMinor: gross,
+      businessFundedShareMinor: share, founderBalanceMinor: founderBalance,
       settledPaidMinor: a.settledPaid, settledReceivedMinor: a.settledReceived,
       outstandingMinor: outstanding,
       outstandingReceivableMinor: Math.max(outstanding, 0),
       outstandingPayableMinor: Math.max(-outstanding, 0),
+      overSettledMinor: overSettled,
       action: outstanding > 0 ? 'receive' : outstanding < 0 ? 'pay' : 'settled',
       settlementStatus: outstanding === 0 ? 'settled' : activity ? 'partially_settled' : 'open',
-    };
+    } satisfies FounderFinancialPosition;
   });
 
+  // ---- Diagnostics that do not exclude anything (the records are structurally valid, but the data looks inconsistent).
+  const sumEffects = (kind: EffectKind) => effects.reduce((s2, e) => (e.kind === kind ? add(s2, e.amountMinor) : s2), 0);
+  const totalExpense = sumEffects('expense_paid');
+  const totalRefund = sumEffects('refund_received');
+  if (totalRefund > totalExpense) warnings.push({ code: 'REFUNDS_EXCEED_EXPENSES', level: 'warning', transactionId: null, message: 'Approved refunds are larger than approved expenses' });
+  if (externalTotal > 0 && externalTotal > totalExpense - totalRefund) warnings.push({ code: 'REIMBURSEMENTS_EXCEED_EXPENSES', level: 'warning', transactionId: null, message: 'Approved reimbursements are larger than the expenses they could cover' });
+  for (const p of founders) {
+    if (p.fairShareMinor < 0) warnings.push({ code: 'NEGATIVE_FAIR_SHARE', level: 'warning', transactionId: null, founderId: p.founderId, message: `${p.founderName}'s refunds exceed their share of expenses` });
+    if (p.reimbursedMinor > p.expensePaidMinor) warnings.push({ code: 'REIMBURSED_MORE_THAN_PAID', level: 'warning', transactionId: null, founderId: p.founderId, message: `${p.founderName} was reimbursed more than the expenses recorded as paid by them` });
+    if (p.overSettledMinor > 0) warnings.push({ code: 'OVER_SETTLED', level: 'warning', transactionId: null, founderId: p.founderId, message: `Settlements moved ${p.founderName} past zero (they paid or received more than was due)` });
+  }
+
   const rec = recommendSettlements(founders.map((p) => ({ founderId: p.founderId, outstandingMinor: p.outstandingMinor })));
-  const sum = (f: (p: FounderFinancialPosition) => number) => founders.reduce((s, p) => add(s, f(p)), 0);
-  const recommendedTotal = rec.recommendations.reduce((s, r) => add(s, r.amountMinor), 0);
-  const unallocated = sum((p) => p.grossNetPositionMinor);
+  const sum = (f: (p: FounderFinancialPosition) => number) => founders.reduce((s2, p) => add(s2, f(p)), 0);
+  const recommendedTotal = rec.recommendations.reduce((s2, r) => add(s2, r.amountMinor), 0);
+
+  const totalPaid = sum((p) => p.paidMinor);
+  const totalFair = sum((p) => p.fairShareMinor);
+  const sumGross = sum((p) => p.grossNetPositionMinor);
+  const founderBalanceSum = sum((p) => p.founderBalanceMinor);
+  const totalReceivable = sum((p) => p.outstandingReceivableMinor);
+  const totalPayable = sum((p) => p.outstandingPayableMinor);
+  const check = (code: string, ok: boolean, detail: string): ReconciliationCheck => ({ code, ok, detail });
+  const checks: ReconciliationCheck[] = [
+    check('FOUNDER_BALANCES_ZERO_SUM', founderBalanceSum === 0, 'Founder-to-founder balances add up to zero'),
+    check('SETTLEMENTS_ZERO_SUM', sum((p) => p.settledPaidMinor) === sum((p) => p.settledReceivedMinor), 'Money settled out equals money settled in'),
+    check('RECEIVABLE_EQUALS_PAYABLE', totalReceivable === totalPayable, 'Founder receivables equal founder payables'),
+    check('EXTERNAL_RECONCILES', sumGross === -externalTotal, 'Paid − fair share across founders equals minus the business-funded amount'),
+    check('FAIR_SHARE_RECONCILES', totalFair === totalExpense - totalRefund, 'Fair shares add up to expenses minus refunds'),
+    check('PAID_RECONCILES', totalPaid === totalExpense - totalRefund - externalTotal, 'Paid adds up to expenses minus refunds minus business-funded amounts'),
+    check('RECOMMENDATIONS_CLEAR_BALANCES', recommendedTotal === totalPayable && rec.unresolvedPayableMinor === 0 && rec.unresolvedReceivableMinor === 0, 'Recommended payments clear every founder balance exactly'),
+  ];
+  const failed = checks.filter((c) => !c.ok);
+  const needsReview = warnings.some((w) => w.level === 'warning');
+  const status: ReconciliationStatus = failed.length > 0 ? 'FAIL' : needsReview ? 'REVIEW' : externalTotal > 0 ? 'PASS_WITH_EXTERNAL' : 'PASS';
+  const explanation =
+    status === 'FAIL' ? `Internal check failed: ${failed.map((c) => c.code).join(', ')}`
+    : status === 'REVIEW' ? 'Balances reconcile, but some records or settlements need attention (see warnings)'
+    : status === 'PASS_WITH_EXTERNAL' ? 'Balances reconcile. Part of the expenses was paid from business funds (reimbursements); that amount is shown separately and is not owed between founders'
+    : 'Balances reconcile';
 
   return {
     founders,
     recommendations: rec.recommendations,
     effects,
     reconciliation: {
-      totalPaidMinor: sum((p) => p.paidMinor),
-      totalFairShareMinor: sum((p) => p.fairShareMinor),
-      unallocatedMinor: unallocated,
-      totalReceivableMinor: sum((p) => p.outstandingReceivableMinor),
-      totalPayableMinor: sum((p) => p.outstandingPayableMinor),
+      status, explanation, checks,
+      totalPaidMinor: totalPaid, totalFairShareMinor: totalFair, sumGrossNetPositionMinor: sumGross,
+      externalMinor: externalTotal, founderBalanceSumMinor: founderBalanceSum,
+      totalReceivableMinor: totalReceivable, totalPayableMinor: totalPayable,
       recommendedTotalMinor: recommendedTotal,
-      unresolvedPayableMinor: rec.unresolvedPayableMinor,
-      unresolvedReceivableMinor: rec.unresolvedReceivableMinor,
-      isBalanced: sum((p) => p.outstandingMinor) === 0,
+      unresolvedPayableMinor: rec.unresolvedPayableMinor, unresolvedReceivableMinor: rec.unresolvedReceivableMinor,
+      isBalanced: totalReceivable === totalPayable,
     },
     included,
     excluded,

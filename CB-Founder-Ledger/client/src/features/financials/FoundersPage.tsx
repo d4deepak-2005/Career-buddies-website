@@ -1,3 +1,4 @@
+import { AlertTriangle } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { ErrorBox } from '../../components/ui';
 import { formatMinor, formatSignedMinor } from '../../lib/money';
@@ -30,11 +31,13 @@ export function FoundersPage() {
               </div>
               <ActionBadge action={p.action} />
             </div>
+            {p.overSettledMinor > 0 && <p className="mt-3 flex items-center gap-1.5 text-xs font-semibold text-danger"><AlertTriangle className="h-3.5 w-3.5" aria-hidden />Over-settled by {m(p.overSettledMinor)}: paid or received more than was due</p>}
             <dl className="mt-4 grid grid-cols-2 gap-x-4 gap-y-3">
               <Stat label="Paid" value={m(p.paidMinor)} />
               <Stat label="Fair share" value={m(p.fairShareMinor)} />
-              <Stat label="Net position" value={formatSignedMinor(p.grossNetPositionMinor, currency)} tone={p.grossNetPositionMinor > 0 ? 'receive' : p.grossNetPositionMinor < 0 ? 'pay' : undefined} />
-              <Stat label={p.action === 'pay' ? 'Still to pay' : p.action === 'receive' ? 'Still to receive' : 'Outstanding'} value={m(Math.abs(p.outstandingMinor))} tone={p.action === 'receive' ? 'receive' : p.action === 'pay' ? 'pay' : undefined} />
+              <Stat label="Net position" value={formatSignedMinor(p.grossNetPositionMinor, currency)} tone={p.grossNetPositionMinor > 0 ? 'receive' : p.grossNetPositionMinor < 0 ? 'pay' : undefined} hint="Paid − fair share" />
+              <Stat label={p.action === 'pay' ? 'Still to pay' : p.action === 'receive' ? 'Still to receive' : 'Outstanding'} value={m(Math.abs(p.outstandingMinor))} tone={p.action === 'receive' ? 'receive' : p.action === 'pay' ? 'pay' : undefined} hint="Between founders, after settlements" />
+              {p.businessFundedShareMinor > 0 && <Stat label="Business-funded share" value={m(p.businessFundedShareMinor)} hint="External: paid from business funds, not owed to a founder" />}
               <Stat label="Contributed" value={m(p.contributionMinor)} />
               <Stat label="Loan outstanding" value={m(p.loanOutstandingMinor)} />
             </dl>
