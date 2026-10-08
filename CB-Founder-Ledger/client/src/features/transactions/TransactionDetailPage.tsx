@@ -106,6 +106,7 @@ export function TransactionDetailPage() {
           <Row label="Category">{t.category?.name ?? '—'}</Row>
           <Row label="Paid by">{t.paidBy?.name ?? '—'}</Row>
           {t.counterparty && <Row label="Received by">{t.counterparty.name}</Row>}
+          {t.method && <Row label="Payment method">{t.method}</Row>}
           <Row label="Notes">{t.notes ?? '—'}</Row>
           <Row label="Created">{t.createdBy?.name} · {fmtTime(t.createdAt)}</Row>
           <Row label="Last updated">{t.updatedBy?.name} · {fmtTime(t.updatedAt)} (v{t.version})</Row>

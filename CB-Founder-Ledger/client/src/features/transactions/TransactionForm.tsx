@@ -49,6 +49,7 @@ export function TransactionForm({ existing }: { existing?: Transaction }) {
   const [date, setDate] = useState(existing?.transactionDate ?? today());
   const [description, setDescription] = useState(existing?.description ?? '');
   const [notes, setNotes] = useState(existing?.notes ?? '');
+  const [method, setMethod] = useState(existing?.method ?? '');
   const [categoryId, setCategoryId] = useState(existing?.category?.id ?? '');
   const [paidBy, setPaidBy] = useState(existing?.paidBy?.id ?? '');
   const [counterparty, setCounterparty] = useState(existing?.counterparty?.id ?? '');
@@ -122,7 +123,7 @@ export function TransactionForm({ existing }: { existing?: Transaction }) {
     setError(null);
     if (hasLocalError || amountMinor === null || !built && splitVisible) return;
     const content: Record<string, unknown> = { type, amountMinor, transactionDate: date, description: description.trim() };
-    const optional = { notes: notes.trim() || undefined, categoryId: categoryId || undefined, paidByFounderId: paidBy || undefined, counterpartyFounderId: rules.counterparty === 'forbidden' ? undefined : counterparty || undefined, split: splitVisible && built && 'payload' in built ? built.payload : undefined };
+    const optional = { notes: notes.trim() || undefined, method: rules.method === 'forbidden' ? undefined : method.trim() || undefined, categoryId: categoryId || undefined, paidByFounderId: paidBy || undefined, counterpartyFounderId: rules.counterparty === 'forbidden' ? undefined : counterparty || undefined, split: splitVisible && built && 'payload' in built ? built.payload : undefined };
     setBusy(true);
     try {
       let saved: Transaction;
@@ -221,7 +222,14 @@ export function TransactionForm({ existing }: { existing?: Transaction }) {
           </div>
         </div>
 
-        <FounderPicker id="paidBy" label={type === 'settlement' ? 'Who paid?' : type === 'reimbursement' ? 'Who is being reimbursed?' : type === 'founder_contribution' || type === 'founder_loan' ? 'Which founder put the money in?' : 'Paid by'} value={paidBy} onChange={setPaidBy} founders={founders} allowNone={rules.paidBy !== 'required'} error={show('paidBy', 'paidByFounderId')} />
+        {rules.method !== 'forbidden' && (
+          <div>
+            <Label htmlFor="method" hint="(optional)">Payment method</Label>
+            <input id="method" className="field" maxLength={50} placeholder="e.g. UPI, bank transfer, cash" value={method} onChange={(e) => setMethod(e.target.value)} />
+          </div>
+        )}
+
+        <FounderPicker id="paidBy" label={type === 'refund' ? 'Which founder received the refund?' : type === 'settlement' ? 'Who paid?' : type === 'reimbursement' ? 'Who is being reimbursed?' : type === 'founder_contribution' || type === 'founder_loan' ? 'Which founder put the money in?' : 'Paid by'} value={paidBy} onChange={setPaidBy} founders={founders} allowNone={rules.paidBy !== 'required'} error={show('paidBy', 'paidByFounderId')} />
         {rules.counterparty !== 'forbidden' && <FounderPicker id="counterparty" label="Who received the money?" value={counterparty} onChange={setCounterparty} founders={founders.filter((f) => f.id !== paidBy)} allowNone={rules.counterparty !== 'required'} error={show('counterparty', 'counterpartyFounderId')} />}
       </section>
 

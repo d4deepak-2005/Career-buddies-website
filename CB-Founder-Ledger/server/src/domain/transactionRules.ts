@@ -34,18 +34,22 @@ export interface TypeRule {
   counterparty: Need;
   split: Need;
   notes: Need;
+  /** Settlement payment method (e.g. bank transfer, UPI, cash). Free text, optional. */
+  method: Need;
 }
 
 export const RULES: Record<TransactionType, TypeRule> = {
-  business_expense:     { category: 'required', paidBy: 'required', counterparty: 'forbidden', split: 'required',  notes: 'optional' },
-  founder_contribution: { category: 'optional', paidBy: 'required', counterparty: 'forbidden', split: 'forbidden', notes: 'optional' },
-  founder_loan:         { category: 'optional', paidBy: 'required', counterparty: 'forbidden', split: 'forbidden', notes: 'optional' },
+  business_expense:     { category: 'required', paidBy: 'required', counterparty: 'forbidden', split: 'required',  notes: 'optional', method: 'forbidden' },
+  founder_contribution: { category: 'optional', paidBy: 'required', counterparty: 'forbidden', split: 'forbidden', notes: 'optional', method: 'forbidden' },
+  founder_loan:         { category: 'optional', paidBy: 'required', counterparty: 'forbidden', split: 'forbidden', notes: 'optional', method: 'forbidden' },
   // paidBy = the founder being reimbursed (who paid a business expense personally)
-  reimbursement:        { category: 'optional', paidBy: 'required', counterparty: 'forbidden', split: 'forbidden', notes: 'optional' },
+  reimbursement:        { category: 'optional', paidBy: 'required', counterparty: 'forbidden', split: 'forbidden', notes: 'optional', method: 'forbidden' },
   // paidBy = paying founder, counterparty = receiving founder
-  settlement:           { category: 'optional', paidBy: 'required', counterparty: 'required',  split: 'forbidden', notes: 'optional' },
-  refund:               { category: 'optional', paidBy: 'optional', counterparty: 'forbidden', split: 'optional',  notes: 'optional' },
-  other:                { category: 'optional', paidBy: 'optional', counterparty: 'forbidden', split: 'optional',  notes: 'required' },
+  settlement:           { category: 'optional', paidBy: 'required', counterparty: 'required',  split: 'forbidden', notes: 'optional', method: 'optional' },
+  // Phase 3: paidBy = founder who received the returned money; the split says how the refunded cost is shared back.
+  // Both are needed to compute fair share / paid, so they are now required (spec: PHASE-3-CALCULATION-SPEC §1).
+  refund:               { category: 'optional', paidBy: 'required', counterparty: 'forbidden', split: 'required',  notes: 'optional', method: 'forbidden' },
+  other:                { category: 'optional', paidBy: 'optional', counterparty: 'forbidden', split: 'optional',  notes: 'required', method: 'forbidden' },
 };
 
 export const TRANSACTION_STATUSES = ['draft', 'pending_approval', 'approved', 'rejected', 'voided'] as const;
@@ -78,6 +82,7 @@ export interface RuleSubject {
   paidByFounderId?: string | null;
   counterpartyFounderId?: string | null;
   notes?: string | null;
+  method?: string | null;
   hasSplit: boolean;
 }
 
@@ -95,6 +100,7 @@ export function checkTypeRules(s: RuleSubject): RuleIssue[] {
   check(r.counterparty, !!s.counterpartyFounderId, 'counterpartyFounderId', 'Receiving founder');
   check(r.split, s.hasSplit, 'split', 'A split');
   check(r.notes, !!s.notes?.trim(), 'notes', 'Notes');
+  check(r.method, !!s.method?.trim(), 'method', 'Payment method');
   if (s.counterpartyFounderId && s.counterpartyFounderId === s.paidByFounderId) {
     issues.push({ path: 'counterpartyFounderId', code: 'SAME_FOUNDER', message: 'Paying and receiving founder must be different' });
   }

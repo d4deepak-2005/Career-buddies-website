@@ -34,6 +34,7 @@ const contentShape = {
   transactionDate: dateString,
   description: z.string().trim().min(1, 'Description is required').max(200),
   notes: z.string().trim().max(2000).optional(),
+  method: z.string().trim().max(50).optional(),
   categoryId: objectIdString.optional(),
   paidByFounderId: objectIdString.optional(),
   counterpartyFounderId: objectIdString.optional(),
@@ -46,7 +47,7 @@ export type TransactionContent = z.infer<typeof contentSchema>;
 
 export const createSchema = z.object({ ...contentShape, status: z.enum(CREATABLE_STATUSES).default('pending_approval') }).strict();
 
-const nullable = { notes: contentShape.notes.nullable(), categoryId: contentShape.categoryId.nullable(), paidByFounderId: contentShape.paidByFounderId.nullable(), counterpartyFounderId: contentShape.counterpartyFounderId.nullable(), split: splitSchema.nullable() };
+const nullable = { notes: contentShape.notes.nullable(), method: contentShape.method.nullable(), categoryId: contentShape.categoryId.nullable(), paidByFounderId: contentShape.paidByFounderId.nullable(), counterpartyFounderId: contentShape.counterpartyFounderId.nullable(), split: splitSchema.nullable() };
 
 /** `null` clears an optional field. `status` is deliberately not editable here (use /submit, /void). */
 export const patchSchema = z

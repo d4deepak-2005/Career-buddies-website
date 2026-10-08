@@ -44,8 +44,24 @@ describe('creating every transaction type', () => {
     expect(res.status).toBe(201);
     expect(res.body.transaction.counterparty).toMatchObject({ id: w.f.b });
   });
-  it('6. Refund', async () => {
-    expect((await w.a.post('/api/transactions').send(base({ type: 'refund', categoryId: w.cat }))).status).toBe(201);
+  it('6. Refund (Phase 3: needs the founder who received the money and a split of the refunded cost)', async () => {
+    const split = { method: 'equal', entries: [{ founderId: w.f.a }, { founderId: w.f.b }] };
+    const ok = await w.a.post('/api/transactions').send(base({ type: 'refund', categoryId: w.cat, paidByFounderId: w.f.a, split }));
+    expect(ok.status).toBe(201);
+    expect(ok.body.transaction.split.entries.map((e: { allocatedMinor: number }) => e.allocatedMinor)).toEqual([125_000, 125_000]);
+    expect((await w.a.post('/api/transactions').send(base({ type: 'refund', categoryId: w.cat }))).status).toBe(400); // no payee / split
+    expect((await w.a.post('/api/transactions').send(base({ type: 'refund', paidByFounderId: w.f.a }))).status).toBe(400); // no split
+  });
+  it('settlement accepts an optional payment method; other types reject it', async () => {
+    const s = await w.a.post('/api/transactions').send(base({ type: 'settlement', paidByFounderId: w.f.a, counterpartyFounderId: w.f.b, method: 'UPI' }));
+    expect(s.status).toBe(201);
+    expect(s.body.transaction.method).toBe('UPI');
+    expect((await w.a.post('/api/transactions').send(base({ type: 'settlement', paidByFounderId: w.f.a, counterpartyFounderId: w.f.b }))).status).toBe(201);
+    expect((await w.a.post('/api/transactions').send(base({ type: 'founder_loan', paidByFounderId: w.f.a, method: 'UPI' }))).status).toBe(400);
+    expect((await w.a.post('/api/transactions').send(base({ type: 'settlement', paidByFounderId: w.f.a, counterpartyFounderId: w.f.b, method: 'x'.repeat(51) }))).status).toBe(400);
+    const edited = await w.a.patch(`/api/transactions/${s.body.transaction.id}`).send({ expectedVersion: 1, method: null });
+    expect(edited.status).toBe(200);
+    expect(edited.body.transaction.method).toBeNull();
   });
   it('7. Other (notes mandatory)', async () => {
     expect((await w.a.post('/api/transactions').send(base({ type: 'other', notes: 'Misc adjustment agreed by founders' }))).status).toBe(201);

@@ -23,6 +23,12 @@ describe('transaction type rules', () => {
     expect(checkTypeRules({ type: 'settlement', paidByFounderId: 'a', counterpartyFounderId: 'a', ...base }).map((i) => i.code)).toContain('SAME_FOUNDER');
     expect(checkTypeRules({ type: 'settlement', paidByFounderId: 'a', counterpartyFounderId: 'b', ...base })).toEqual([]);
   });
+  it('refund needs the receiving founder and a split; method is settlement-only', () => {
+    expect(checkTypeRules({ type: 'refund', ...base }).map((i) => i.path)).toEqual(expect.arrayContaining(['paidByFounderId', 'split']));
+    expect(checkTypeRules({ type: 'refund', paidByFounderId: 'a', hasSplit: true })).toEqual([]);
+    expect(checkTypeRules({ type: 'settlement', paidByFounderId: 'a', counterpartyFounderId: 'b', method: 'UPI', ...base })).toEqual([]);
+    expect(checkTypeRules({ type: 'founder_loan', paidByFounderId: 'a', method: 'UPI', ...base }).map((i) => i.path)).toContain('method');
+  });
   it('"other" requires notes', () => {
     expect(checkTypeRules({ type: 'other', ...base }).map((i) => i.path)).toContain('notes');
     expect(checkTypeRules({ type: 'other', notes: 'why', ...base })).toEqual([]);

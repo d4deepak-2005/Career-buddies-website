@@ -30,6 +30,7 @@ async function validateContent(content: TransactionContent, existing?: Existing)
     paidByFounderId: content.paidByFounderId,
     counterpartyFounderId: content.counterpartyFounderId,
     notes: content.notes,
+    method: content.method,
     hasSplit: !!content.split,
   });
 
@@ -95,6 +96,7 @@ function fieldsFor(content: TransactionContent, resolved?: SplitEntryResolved[])
     transactionDate: toDate(content.transactionDate),
     description: content.description,
     notes: content.notes?.trim() || undefined,
+    method: content.method?.trim() || undefined,
     categoryId: content.categoryId,
     paidByFounderId: content.paidByFounderId,
     counterpartyFounderId: content.counterpartyFounderId,
@@ -118,6 +120,7 @@ function contentFromStored(tx: StoredTx): TransactionContent {
     transactionDate: tx.transactionDate.toISOString().slice(0, 10),
     description: tx.description,
     ...(tx.notes ? { notes: tx.notes } : {}),
+    ...(tx.method ? { method: tx.method } : {}),
     ...(tx.categoryId ? { categoryId: String(tx.categoryId) } : {}),
     ...(tx.paidByFounderId ? { paidByFounderId: String(tx.paidByFounderId) } : {}),
     ...(tx.counterpartyFounderId ? { counterpartyFounderId: String(tx.counterpartyFounderId) } : {}),
@@ -169,6 +172,7 @@ export async function hydrate(txs: StoredTx[]) {
     amountMinor: t.amountMinor,
     description: t.description,
     notes: t.notes ?? null,
+    method: t.method ?? null,
     category: named(c, t.categoryId),
     paidBy: named(f, t.paidByFounderId),
     counterparty: named(f, t.counterpartyFounderId),

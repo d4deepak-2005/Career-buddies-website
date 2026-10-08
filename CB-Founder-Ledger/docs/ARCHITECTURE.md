@@ -1,6 +1,6 @@
 # Architecture
 
-Source of truth for requirements: *CareerBuddies Founder Finance — Full Web App Product Plan* (PDF). This document covers what exists after Phase 2 (Phase 2 details: [PHASE-2.md](PHASE-2.md)).
+Source of truth for requirements: *CareerBuddies Founder Finance — Full Web App Product Plan* (PDF). This document covers what exists after Phase 3 (details: [PHASE-2.md](PHASE-2.md), [PHASE-3-CALCULATION-SPEC.md](PHASE-3-CALCULATION-SPEC.md)).
 
 ## Layout
 
@@ -35,11 +35,13 @@ The API is same-origin from the browser's point of view (nginx in Docker, Vite p
 | `modules/<name>/*.routes.ts` | One router per module (`auth`, `users`, `founders`, `categories`, `health`, `config`, `transactions`, `receipts`) |
 | `modules/transactions/*.service.ts` | Create / edit / submit / void with validation, optimistic locking and history |
 | `domain/` | **Pure business rules**, no I/O: `splits.ts` (split validation + per-transaction allocation), `transactionRules.ts` (type rules, status lifecycle). Phase 3 will add the calculation/settlement engine here |
+| `domain/calculationEngine.ts`, `domain/settlementAlgorithm.ts` | **Phase 3 — the single source of truth for money results.** Pure functions over stored transactions + founders: fair share, paid, net position, outstanding, settlement recommendations, with a traceable per-transaction ledger of effects. Only `approved` transactions count |
+| `modules/financials/*` | Loads founders + transactions (one query each, minimal fields), calls the engine, shapes read-only API responses. No caching; recomputed per request |
 | `storage/receiptStorage.ts` | `ReceiptStorage` interface + local private-directory implementation (swap for object storage) |
 | `lib/` | Password hashing, token helpers, `AppError`, `asyncHandler` |
 | `scripts/seedAdmin.ts` | Creates the first admin only. **No financial data.** |
 
-**Business logic location:** all financial rules live in `server/src/domain/` and are called by services; the client never calculates amounts (it formats and parses input only, and asks the server to preview splits). Phase 3's fair-share / net-position / settlement engine will be added to `domain/` — it does **not** exist yet.
+**Business logic location:** all financial rules live in `server/src/domain/` and are called by services; the client never calculates amounts (it formats and parses input only, asks the server to preview splits, and displays the engine's results — enforced by a test that scans the financial views for arithmetic on money values). The dashboard (Phase 4), approvals (5) and reports (7) must consume `calculationEngine` rather than re-deriving figures.
 
 ### Error contract
 

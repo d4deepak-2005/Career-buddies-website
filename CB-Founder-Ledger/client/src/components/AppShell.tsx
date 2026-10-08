@@ -15,7 +15,7 @@ function NavList({ onNavigate }: { onNavigate?: () => void }) {
         <NavLink
           key={path}
           to={path}
-          end={path !== '/transactions'}
+          end={path !== '/transactions' && path !== '/founders'}
           onClick={onNavigate}
           className={({ isActive }) =>
             `flex min-h-11 items-center gap-3 rounded-xl px-3 text-sm font-semibold transition ${
@@ -50,7 +50,7 @@ export function AppShell() {
   const { user, logout } = useAuth();
   const { pathname } = useLocation();
   const [open, setOpen] = useState(false);
-  const title = pathname.startsWith('/transactions/') && pathname !== '/transactions/new' ? (pathname.endsWith('/edit') ? 'Edit Transaction' : 'Transaction') : (MODULES.find((m) => m.path === pathname)?.label ?? 'CareerBuddies');
+  const title = pathname.startsWith('/founders/') ? 'Founder Ledger' : pathname.startsWith('/transactions/') && pathname !== '/transactions/new' ? (pathname.endsWith('/edit') ? 'Edit Transaction' : 'Transaction') : (MODULES.find((m) => m.path === pathname)?.label ?? 'CareerBuddies');
 
   useEffect(() => setOpen(false), [pathname]);
   useEffect(() => {

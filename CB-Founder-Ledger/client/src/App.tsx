@@ -3,6 +3,9 @@ import { Navigate, Route, Routes } from 'react-router-dom';
 import { AppShell } from './components/AppShell';
 import { ModulePlaceholder } from './components/ModulePlaceholder';
 import { ProtectedRoute } from './components/ProtectedRoute';
+import { FounderLedgerPage } from './features/financials/FounderLedgerPage';
+import { FoundersPage } from './features/financials/FoundersPage';
+import { SettlementsPage } from './features/financials/SettlementsPage';
 import { SettingsPage } from './features/settings/SettingsPage';
 import { AddTransactionPage, EditTransactionPage } from './features/transactions/TransactionFormPages';
 import { TransactionDetailPage } from './features/transactions/TransactionDetailPage';
@@ -15,6 +18,8 @@ import { LoginPage } from './pages/LoginPage';
 const IMPLEMENTED: Record<string, ReactElement> = {
   '/transactions': <TransactionsPage />,
   '/transactions/new': <AddTransactionPage />,
+  '/founders': <FoundersPage />,
+  '/settlements': <SettlementsPage />,
   '/settings': <SettingsPage />,
 };
 
@@ -28,6 +33,7 @@ export function App() {
         <Route element={<AppConfigProvider><AppShell /></AppConfigProvider>}>
           <Route index element={<Navigate to="/dashboard" replace />} />
           {MODULES.filter((m) => m.roles.length === 2).map((m) => <Route key={m.path} path={m.path} element={page(m)} />)}
+          <Route path="/founders/:id" element={<FounderLedgerPage />} />
           <Route path="/transactions/:id" element={<TransactionDetailPage />} />
           <Route path="/transactions/:id/edit" element={<EditTransactionPage />} />
           <Route element={<ProtectedRoute roles={['admin']} />}>

@@ -27,3 +27,9 @@ export function minorToInput(minor: number, minorUnits: number): string {
   const frac = s.slice(-minorUnits).replace(/0+$/, '');
   return frac ? `${whole}.${frac}` : whole;
 }
+
+/** Display only: shows a server-provided signed amount with an explicit +/− (never used to compute anything). */
+export function formatSignedMinor(minor: number, c: CurrencyConfig): string {
+  const body = formatMinor(Math.abs(minor), c);
+  return minor > 0 ? `+${body}` : minor < 0 ? `−${body}` : body;
+}

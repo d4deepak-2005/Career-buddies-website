@@ -156,3 +156,11 @@ Zod `.strict()` everywhere (unknown fields → 400, including `status`, `version
 * The split preview is a server call (debounced ~250 ms) so rules live in one place, not instantaneous in the browser.
 * Category/founder admin UIs: only categories have a UI (Settings). Founder profiles are managed via API.
 * Currency is a single global configuration.
+
+## Changes made later by Phase 3 (needed to make calculations well-defined)
+
+* **Refund** now requires a *paid-by* founder (the founder who received the returned money) and a split (how the refunded cost is shared back). Previously both were optional.
+* **Settlement** has an optional `method` field (≤50 chars, settlement only).
+* Two extra indexes (`counterpartyFounderId`, `split.entries.founderId`) for the founder ledger.
+
+Rationale and the full accounting treatment are in [PHASE-3-CALCULATION-SPEC.md](PHASE-3-CALCULATION-SPEC.md).

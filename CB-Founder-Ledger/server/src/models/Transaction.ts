@@ -45,6 +45,8 @@ const transactionSchema = new Schema(
     paidByFounderId: { type: Schema.Types.ObjectId, ref: 'Founder' },
     /** Receiving founder (settlement only). */
     counterpartyFounderId: { type: Schema.Types.ObjectId, ref: 'Founder' },
+    /** Settlement payment method (settlement type only). */
+    method: { type: String, trim: true, maxlength: 50 },
     transactionDate: { type: Date, required: true },
     status: { type: String, enum: TRANSACTION_STATUSES, required: true, default: 'pending_approval' },
     /** Split definition + resolved per-founder responsibility, embedded (no separate collection). */
@@ -67,6 +69,9 @@ transactionSchema.index({ categoryId: 1, transactionDate: -1 });
 transactionSchema.index({ paidByFounderId: 1, transactionDate: -1 });
 transactionSchema.index({ createdBy: 1, createdAt: -1 });
 transactionSchema.index({ amountMinor: 1 });
+// Phase 3: founder-involvement lookups for the founder ledger.
+transactionSchema.index({ counterpartyFounderId: 1, transactionDate: -1 });
+transactionSchema.index({ 'split.entries.founderId': 1 });
 
 // Financial records are never hard-deleted. Use void.
 const blocked = (): never => {

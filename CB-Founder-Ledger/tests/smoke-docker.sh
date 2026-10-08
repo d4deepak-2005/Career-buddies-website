@@ -78,6 +78,17 @@ check "voided record still readable"    200 "$(code -b "$JAR_A" "$BASE/api/trans
 for f in $(curl -s -b "$JAR_A" "$BASE/api/founders" | grep -o '"id":"[a-f0-9]\{24\}","name":"\[SMOKE\][^"]*"' | cut -d'"' -f4); do curl -s -o /dev/null -b "$JAR_A" -X PATCH -H "$J" -d '{"active":false}' "$BASE/api/founders/$f"; done
 for c in $(curl -s -b "$JAR_A" "$BASE/api/categories" | grep -o '"id":"[a-f0-9]\{24\}","name":"\[SMOKE\][^"]*"' | cut -d'"' -f4); do curl -s -o /dev/null -b "$JAR_A" -X PATCH -H "$J" -d '{"active":false}' "$BASE/api/categories/$c"; done
 rm -f "$PNGFILE" "$BADFILE" "$JAR_G"
+# ---------------------------------------------------------------- Phase 3: calculation endpoints (read-only)
+check "positions need sign-in"          401 "$(code "$BASE/api/founders/financial-positions")"
+check "recommendations need sign-in"    401 "$(code "$BASE/api/settlements/recommendations")"
+check "founder reads positions"         200 "$(code -b "$JAR_F" "$BASE/api/founders/financial-positions")"
+check "positions include pending-excluded count" "yes" "$(curl -s -b "$JAR_F" "$BASE/api/founders/financial-positions" | grep -q '"excluded"' && echo yes || echo no)"
+check "founder reads ledger"            200 "$(code -b "$JAR_F" "$BASE/api/founders/$FA/financial-position")"
+check "unknown founder ledger"          404 "$(code -b "$JAR_F" "$BASE/api/founders/64b7f0f0f0f0f0f0f0f0f0f0/financial-position")"
+check "recommendations"                 200 "$(code -b "$JAR_F" "$BASE/api/settlements/recommendations")"
+check "settlement summary"              200 "$(code -b "$JAR_F" "$BASE/api/settlements/summary")"
+check "client-supplied figures rejected" 400 "$(code -b "$JAR_F" "$BASE/api/settlements/summary?netPositionMinor=5")"
+check "pending expense is NOT counted"  "0" "$(curl -s -b "$JAR_F" "$BASE/api/founders/financial-positions" | grep -o '"totalFairShareMinor":[0-9-]*' | cut -d: -f2)"
 check "refresh works"                  200 "$(code -b "$JAR_A" -c "$JAR_A" -X POST "$BASE/api/auth/refresh")"
 check "logout"                         204 "$(code -b "$JAR_A" -X POST "$BASE/api/auth/logout")"
 check "after logout /me rejected"      401 "$(code -b "$JAR_A" "$BASE/api/auth/me")"

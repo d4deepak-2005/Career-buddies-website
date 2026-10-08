@@ -5,7 +5,7 @@ import type { Transaction } from '../../lib/types';
 import { adminUser, categoriesFixture, founderUser, mockFetch, renderApp } from '../../test/utils';
 
 const tx = (over: Partial<Transaction> = {}): Transaction => ({
-  id: 't1', txnNumber: 'TXN-000001', type: 'business_expense', amountMinor: 3_000_000, description: 'Cloud hosting', notes: null,
+  id: 't1', txnNumber: 'TXN-000001', type: 'business_expense', amountMinor: 3_000_000, description: 'Cloud hosting', notes: null, method: null,
   category: { id: 'c1', name: 'Software' }, paidBy: { id: 'f1', name: 'Asha' }, counterparty: null, transactionDate: '2026-04-15', status: 'pending_approval',
   split: { method: 'equal', entries: [{ founderId: 'f1', founderName: 'Asha', allocatedMinor: 1_000_000 }, { founderId: 'f2', founderName: 'Bilal', allocatedMinor: 1_000_000 }, { founderId: 'f3', founderName: 'Chen', allocatedMinor: 1_000_000 }] },
   receiptCount: 1, void: null, version: 1, createdBy: { id: '2', name: 'Founder One' }, updatedBy: { id: '2', name: 'Founder One' }, createdAt: '2026-04-15T10:00:00Z', updatedAt: '2026-04-15T10:00:00Z', ...over,
