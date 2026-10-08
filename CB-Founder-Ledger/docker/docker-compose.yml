@@ -29,6 +29,8 @@ services:
     depends_on:
       mongo:
         condition: service_healthy
+    volumes:
+      - receipts-data:/data/receipts
     environment:
       NODE_ENV: ${NODE_ENV:-production}
       PORT: 4000
@@ -43,6 +45,12 @@ services:
       BCRYPT_COST: ${BCRYPT_COST:-12}
       AUTH_RATE_LIMIT_MAX: ${AUTH_RATE_LIMIT_MAX:-10}
       AUTH_RATE_LIMIT_WINDOW_MINUTES: ${AUTH_RATE_LIMIT_WINDOW_MINUTES:-15}
+      WRITE_RATE_LIMIT_MAX: ${WRITE_RATE_LIMIT_MAX:-120}
+      UPLOAD_RATE_LIMIT_MAX: ${UPLOAD_RATE_LIMIT_MAX:-30}
+      CURRENCY_CODE: ${CURRENCY_CODE:-INR}
+      CURRENCY_MINOR_UNITS: ${CURRENCY_MINOR_UNITS:-2}
+      RECEIPT_STORAGE_DIR: /data/receipts
+      RECEIPT_MAX_BYTES: ${RECEIPT_MAX_BYTES:-5242880}
       SEED_ADMIN_EMAIL: ${SEED_ADMIN_EMAIL:-}
       SEED_ADMIN_PASSWORD: ${SEED_ADMIN_PASSWORD:-}
       SEED_ADMIN_NAME: ${SEED_ADMIN_NAME:-Admin}
@@ -62,3 +70,4 @@ services:
 
 volumes:
   mongo-data:
+  receipts-data:

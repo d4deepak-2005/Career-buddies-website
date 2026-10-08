@@ -21,6 +21,15 @@ const schema = z
     BCRYPT_COST: z.coerce.number().int().min(4).max(15).default(12),
     AUTH_RATE_LIMIT_MAX: z.coerce.number().int().min(1).default(10),
     AUTH_RATE_LIMIT_WINDOW_MINUTES: z.coerce.number().int().min(1).default(15),
+    // Writes (create/edit/void) per IP per minute, and receipt uploads per IP per 15 minutes.
+    WRITE_RATE_LIMIT_MAX: z.coerce.number().int().min(1).default(120),
+    UPLOAD_RATE_LIMIT_MAX: z.coerce.number().int().min(1).default(30),
+    // Currency is configuration, never hard-coded into business logic. Amounts are integers of minor units.
+    CURRENCY_CODE: z.string().regex(/^[A-Z]{3}$/, 'CURRENCY_CODE must be a 3-letter ISO 4217 code').default('INR'),
+    CURRENCY_MINOR_UNITS: z.coerce.number().int().min(0).max(3).default(2),
+    // Private receipt storage (local directory or Docker volume). Never served statically.
+    RECEIPT_STORAGE_DIR: z.string().min(1).default('./data/receipts'),
+    RECEIPT_MAX_BYTES: z.coerce.number().int().min(1024).max(25 * 1024 * 1024).default(5 * 1024 * 1024),
   })
   .superRefine((env, ctx) => {
     if (env.NODE_ENV === 'production') {

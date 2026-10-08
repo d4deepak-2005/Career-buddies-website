@@ -7,6 +7,7 @@ import { BrandLogo } from './BrandLogo';
 
 function NavList({ onNavigate }: { onNavigate?: () => void }) {
   const { user } = useAuth();
+  const location = useLocation();
   const items = user ? modulesFor(user.role) : [];
   return (
     <nav aria-label="Main" className="flex flex-col gap-1 px-3 pb-6">
@@ -14,11 +15,11 @@ function NavList({ onNavigate }: { onNavigate?: () => void }) {
         <NavLink
           key={path}
           to={path}
-          end
+          end={path !== '/transactions'}
           onClick={onNavigate}
           className={({ isActive }) =>
             `flex min-h-11 items-center gap-3 rounded-xl px-3 text-sm font-semibold transition ${
-              isActive ? 'bg-cb-navy text-white shadow-card' : 'text-ink-muted hover:bg-surface-alt hover:text-cb-navy'
+              isActive && !(path === '/transactions' && location.pathname === '/transactions/new') ? 'bg-cb-navy text-white shadow-card' : 'text-ink-muted hover:bg-surface-alt hover:text-cb-navy'
             }`
           }
         >
@@ -49,7 +50,7 @@ export function AppShell() {
   const { user, logout } = useAuth();
   const { pathname } = useLocation();
   const [open, setOpen] = useState(false);
-  const title = MODULES.find((m) => m.path === pathname)?.label ?? 'CareerBuddies';
+  const title = pathname.startsWith('/transactions/') && pathname !== '/transactions/new' ? (pathname.endsWith('/edit') ? 'Edit Transaction' : 'Transaction') : (MODULES.find((m) => m.path === pathname)?.label ?? 'CareerBuddies');
 
   useEffect(() => setOpen(false), [pathname]);
   useEffect(() => {

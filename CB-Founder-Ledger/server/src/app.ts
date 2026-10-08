@@ -7,9 +7,11 @@ import { errorHandler, notFoundHandler } from './middleware/errorHandler';
 import { originCheck } from './middleware/originCheck';
 import { rejectUnsafeKeys } from './middleware/sanitize';
 import { authRouter } from './modules/auth/auth.routes';
+import { configRouter } from './modules/config/config.routes';
 import { categoriesRouter } from './modules/categories/categories.routes';
 import { foundersRouter } from './modules/founders/founders.routes';
 import { healthRouter } from './modules/health/health.routes';
+import { transactionsRouter } from './modules/transactions/transactions.routes';
 import { usersRouter } from './modules/users/users.routes';
 
 export function createApp(): Express {
@@ -41,6 +43,8 @@ export function createApp(): Express {
   app.use('/api/users', usersRouter);
   app.use('/api/founders', foundersRouter);
   app.use('/api/categories', categoriesRouter);
+  app.use('/api/config', configRouter);
+  app.use('/api/transactions', transactionsRouter);
 
   app.use(notFoundHandler);
   app.use(errorHandler);

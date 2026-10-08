@@ -20,8 +20,8 @@ const updateSchema = z.object({ ...fields, active: z.boolean() }).partial().stri
 
 const idParams = z.object({ id: z.string().refine((v) => Types.ObjectId.isValid(v), 'Invalid id') });
 
-function publicCategory(c: { _id: unknown; name: string; slug: string; description?: string | null; active: boolean }) {
-  return { id: String(c._id), name: c.name, slug: c.slug, description: c.description ?? null, active: c.active };
+function publicCategory(c: { _id: unknown; name: string; slug: string; description?: string | null; active: boolean; isDevSeed?: boolean }) {
+  return { id: String(c._id), name: c.name, slug: c.slug, description: c.description ?? null, active: c.active, isDevSeed: c.isDevSeed ?? false };
 }
 
 export const categoriesRouter = Router();

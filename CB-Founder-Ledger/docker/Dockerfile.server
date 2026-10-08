@@ -15,6 +15,9 @@ WORKDIR /app
 COPY server/package*.json ./
 RUN npm ci --omit=dev && npm cache clean --force
 COPY --from=build /app/dist ./dist
+# Private receipt storage: owned by the unprivileged user, mounted as a named volume by compose.
+RUN mkdir -p /data/receipts && chown -R node:node /data
+ENV RECEIPT_STORAGE_DIR=/data/receipts
 USER node
 EXPOSE 4000
 HEALTHCHECK --interval=15s --timeout=3s --start-period=20s --retries=5 \

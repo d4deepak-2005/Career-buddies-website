@@ -7,6 +7,8 @@ const categorySchema = new Schema(
     slug: { type: String, required: true, unique: true, lowercase: true, trim: true, maxlength: 100 },
     description: { type: String, trim: true, maxlength: 300 },
     active: { type: Boolean, required: true, default: true },
+    /** True only for categories inserted by `npm run seed:dev-categories`. Never assumed by any logic. */
+    isDevSeed: { type: Boolean, required: true, default: false },
   },
   { timestamps: true },
 );

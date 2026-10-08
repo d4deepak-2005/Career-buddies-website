@@ -1,6 +1,6 @@
 # CareerBuddies Founder Finance
 
-Private, responsive web app for the three CareerBuddies founders (investment, expenses, settlements). MongoDB is the source of truth; all financial logic will live in the backend. **Current state: Phase 1 — Foundation** (auth, roles, models, brand shell, placeholders). No financial features yet. See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) and [`docs/PHASE-1.md`](docs/PHASE-1.md).
+Private, responsive web app for the three CareerBuddies founders (investment, expenses, settlements). MongoDB is the source of truth; all financial logic will live in the backend. **Current state: Phase 2 — Transactions** (add/edit/view/void transactions, categories, split definitions, private receipts) on top of the Phase 1 foundation. **The Phase 3 calculation/settlement engine, dashboard figures, approvals, recurring and reports are not built.** See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md), [`docs/PHASE-1.md`](docs/PHASE-1.md) and [`docs/PHASE-2.md`](docs/PHASE-2.md).
 
 Stack: React 19 · TypeScript (strict) · Vite · Tailwind CSS 3 · Lucide — Node 22 · Express 4 · Mongoose 8 · Zod · MongoDB 7.
 
@@ -20,11 +20,14 @@ cp .env.example server/.env              # then edit server/.env:
 #   SEED_ADMIN_EMAIL=you@example.com   SEED_ADMIN_PASSWORD=<12+ chars>
 
 npm run seed:admin                       # creates the first admin (no financial data)
+npm --prefix server run seed:dev-categories   # OPTIONAL, development only: 4 generic categories flagged isDevSeed
 npm run dev:server                       # API  → http://localhost:4000  (terminal 1)
 npm run dev:client                       # Web  → http://localhost:5173  (terminal 2)
 ```
 
 Open http://localhost:5173 and sign in with the seeded admin. The Vite dev server proxies `/api` to the API. Create further users as admin via `POST /api/users`.
+
+To record a transaction you need at least one founder profile (`POST /api/founders`, admin) and, for business expenses, a category (Settings page, or the optional dev seed above). Receipts are stored privately in `RECEIPT_STORAGE_DIR` (default `server/data/receipts`, git-ignored).
 
 ## 2. Docker development (MongoDB + API + web)
 
@@ -37,6 +40,7 @@ cp .env.example .env
 docker compose --env-file .env -f docker/docker-compose.yml up --build -d
 docker compose --env-file .env -f docker/docker-compose.yml exec server node dist/scripts/seedAdmin.js
 # → http://localhost:8080     health: http://localhost:8080/api/health
+# Receipts live in the `receipts-data` volume; MongoDB in `mongo-data`.
 
 SMOKE_ADMIN_EMAIL=<seed email> SMOKE_ADMIN_PASSWORD=<seed password> npm run docker:smoke   # optional end-to-end check
 docker compose --env-file .env -f docker/docker-compose.yml down        # add -v to also delete the database volume
@@ -50,8 +54,8 @@ Server tests need a MongoDB (they use the database `cb_founder_ledger_test` and 
 
 ```bash
 npm test                      # server + client
-npm --prefix server test      # API, auth, RBAC, validation, config, DB, rate-limit
-npm --prefix client test      # routing, login flow, API client, responsive nav
+npm --prefix server test      # API, auth, RBAC, validation, config, DB, rate-limit, transactions, splits, receipts
+npm --prefix client test      # routing, login flow, API client, transactions list/form/detail, settings
 ```
 
 ## 4. Typecheck
@@ -68,7 +72,9 @@ NODE_ENV=production node server/dist/server.js   # needs env vars from .env.exam
 docker compose --env-file .env -f docker/docker-compose.yml build    # container images
 ```
 
-## API (Phase 1)
+## API
+
+Transactions, splits and receipts endpoints are listed in [`docs/PHASE-2.md`](docs/PHASE-2.md#api-all-under-api-all-require-a-signed-in-user). Phase 1 endpoints:
 
 | Method & path | Access |
 |---|---|

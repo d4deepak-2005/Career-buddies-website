@@ -1,6 +1,6 @@
 # Architecture
 
-Source of truth for requirements: *CareerBuddies Founder Finance — Full Web App Product Plan* (PDF). This document covers only what exists after Phase 1.
+Source of truth for requirements: *CareerBuddies Founder Finance — Full Web App Product Plan* (PDF). This document covers what exists after Phase 2 (Phase 2 details: [PHASE-2.md](PHASE-2.md)).
 
 ## Layout
 
@@ -32,11 +32,14 @@ The API is same-origin from the browser's point of view (nginx in Docker, Vite p
 | `db/connect.ts` | Mongoose connection, `sanitizeFilter`, DB state for health |
 | `models/` | `User`, `Founder`, `Category` |
 | `middleware/` | `authenticate`, `requireRole`, `validate` (Zod), `rejectUnsafeKeys`, `originCheck`, rate limiter, error handler |
-| `modules/<name>/*.routes.ts` | One router per module (`auth`, `users`, `founders`, `categories`, `health`) |
+| `modules/<name>/*.routes.ts` | One router per module (`auth`, `users`, `founders`, `categories`, `health`, `config`, `transactions`, `receipts`) |
+| `modules/transactions/*.service.ts` | Create / edit / submit / void with validation, optimistic locking and history |
+| `domain/` | **Pure business rules**, no I/O: `splits.ts` (split validation + per-transaction allocation), `transactionRules.ts` (type rules, status lifecycle). Phase 3 will add the calculation/settlement engine here |
+| `storage/receiptStorage.ts` | `ReceiptStorage` interface + local private-directory implementation (swap for object storage) |
 | `lib/` | Password hashing, token helpers, `AppError`, `asyncHandler` |
 | `scripts/seedAdmin.ts` | Creates the first admin only. **No financial data.** |
 
-**Reserved for later phases (not created yet):** a `domain/` layer holding *all* financial rules (splits, fair share, net position, settlements). Routes and the dashboard will call that layer; the client will never calculate totals. Nothing financial exists in Phase 1.
+**Business logic location:** all financial rules live in `server/src/domain/` and are called by services; the client never calculates amounts (it formats and parses input only, and asks the server to preview splits). Phase 3's fair-share / net-position / settlement engine will be added to `domain/` — it does **not** exist yet.
 
 ### Error contract
 
@@ -77,10 +80,13 @@ React 19 + React Router. `AuthProvider` loads the session from `/api/auth/me`; `
 
 Tokens in `tailwind.config.js` come from the official logo/website palette: navy `#002869`, blue `#0052a3`/`#0055b3`, green `#00a63f`/`#008040`, white cards (rounded 1.25rem, soft shadow), Plus Jakarta Sans (self-hosted via `@fontsource`, same family as the website). The logo is used unmodified from `client/public/brand/careerbuddies-logo.png`.
 
-## Data model (Phase 1)
+## Data model
 
 - **users** — email (unique), name, passwordHash (not selected by default), role, status, sessions[], lastLoginAt.
 - **founders** — name, email?, userId? (unique link to a user), defaultSharePercent? (0–100), active.
 - **categories** — name, slug (unique, derived), description?, active.
 
-Founders and categories are deactivated, never deleted.
+- **transactions** (embedded split), **transaction_revisions** (append-only), **receipts** (metadata only), **counters** — see PHASE-2.md.
+- categories also carry `isDevSeed`.
+
+Founders, categories and transactions are deactivated / voided, never deleted. Receipt bytes are never stored in MongoDB.
