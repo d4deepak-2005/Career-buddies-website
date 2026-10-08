@@ -1,0 +1,20 @@
+@import '@fontsource-variable/plus-jakarta-sans';
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html { -webkit-text-size-adjust: 100%; }
+  body { @apply bg-surface-alt font-sans text-ink antialiased; }
+  :focus-visible { @apply outline-2 outline-offset-2 outline-cb-blue; }
+}
+
+@layer components {
+  .card { @apply rounded-card border border-surface-line bg-surface shadow-card; }
+  .btn { @apply inline-flex min-h-11 items-center justify-center gap-2 rounded-xl px-5 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-60; }
+  .btn-primary { @apply btn bg-cb-blue text-white hover:bg-cb-navy; }
+  .btn-ghost { @apply btn text-cb-navy hover:bg-surface-alt; }
+  .field { @apply block min-h-11 w-full rounded-xl border border-surface-line bg-white px-4 text-sm text-ink placeholder:text-ink-faint focus:border-cb-blue focus:outline-none focus:ring-2 focus:ring-cb-blue/20; }
+  .badge { @apply inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold; }
+}

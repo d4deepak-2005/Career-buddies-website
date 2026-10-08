@@ -1,0 +1,18 @@
+{
+  "name": "cb-founder-ledger",
+  "version": "0.1.0",
+  "private": true,
+  "description": "CareerBuddies Founder Finance - monorepo convenience scripts (no shared dependencies)",
+  "scripts": {
+    "install:all": "npm --prefix server ci && npm --prefix client ci",
+    "dev:server": "npm --prefix server run dev",
+    "dev:client": "npm --prefix client run dev",
+    "typecheck": "npm --prefix server run typecheck && npm --prefix client run typecheck",
+    "test": "npm --prefix server test && npm --prefix client test",
+    "build": "npm --prefix server run build && npm --prefix client run build",
+    "seed:admin": "npm --prefix server run seed:admin",
+    "docker:up": "docker compose --env-file .env -f docker/docker-compose.yml up --build -d",
+    "docker:down": "docker compose --env-file .env -f docker/docker-compose.yml down",
+    "docker:smoke": "bash tests/smoke-docker.sh"
+  }
+}
