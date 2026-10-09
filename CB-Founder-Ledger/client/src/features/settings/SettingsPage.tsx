@@ -1,4 +1,5 @@
 import { BarChart3, Building2, CalendarClock, Coins, Handshake, ImageIcon, LayoutDashboard, ListTree, Scale, ShieldCheck, UserCog, Users, type LucideIcon } from 'lucide-react';
+import type { ReactElement } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useConfirmLeave } from '../../lib/dirty';
 import { CategoriesSection } from './CategoriesSection';
@@ -6,7 +7,7 @@ import { FoundersSection } from './FoundersSection';
 import { ApprovalsSection, BrandingSection, BusinessSection, DashboardSection, PolicySection, RecurringSection, RegionalSection, ReportingSection, SettlementsSection } from './sections';
 import { UsersSection } from './UsersSection';
 
-const SECTIONS: Array<{ id: string; label: string; icon: LucideIcon; render: () => JSX.Element }> = [
+const SECTIONS: Array<{ id: string; label: string; icon: LucideIcon; render: () => ReactElement }> = [
   { id: 'business', label: 'Business profile', icon: Building2, render: () => <BusinessSection /> },
   { id: 'branding', label: 'Branding and logo', icon: ImageIcon, render: () => <BrandingSection /> },
   { id: 'founders', label: 'Founders', icon: Users, render: () => <FoundersSection /> },

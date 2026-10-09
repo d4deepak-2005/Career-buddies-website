@@ -8,8 +8,8 @@ import type { Founder } from '../../lib/types';
 import { useResource } from '../../lib/useResource';
 import { SettingsCard } from './settingsKit';
 
-function FounderRow({ f, index, count, busy, onMove, onChanged, run }: {
-  f: Founder; index: number; count: number; busy: boolean; onMove: (dir: -1 | 1) => void; onChanged: () => void; run: (fn: () => Promise<unknown>) => Promise<void>;
+function FounderRow({ f, index, count, busy, onMove, run }: {
+  f: Founder; index: number; count: number; busy: boolean; onMove: (dir: -1 | 1) => void; run: (fn: () => Promise<unknown>) => Promise<void>;
 }) {
   const cfg = useAppConfig();
   const file = useRef<HTMLInputElement>(null);
@@ -91,7 +91,7 @@ export function FoundersSection() {
       {error && <div className="mb-3"><ErrorBox error={error} /></div>}
       {notice && <p role="status" className="mb-3 rounded-xl bg-cb-green/10 px-4 py-3 text-sm font-semibold text-cb-green-dark">{notice}</p>}
       {list.length > 0 && <ul className="space-y-3" aria-label="Founders">
-        {list.map((f, i) => <FounderRow key={`${f.id}-${f.name}-${f.role}-${f.photoUrl}`} f={f} index={i} count={list.length} busy={busy} onMove={(d) => move(i, d)} onChanged={res.reload} run={run} />)}
+        {list.map((f, i) => <FounderRow key={`${f.id}-${f.name}-${f.role}-${f.photoUrl}`} f={f} index={i} count={list.length} busy={busy} onMove={(d) => move(i, d)} run={run} />)}
       </ul>}
       <form onSubmit={add} className="mt-5 grid gap-3 border-t border-surface-line pt-5 sm:grid-cols-[1fr_1fr_auto] sm:items-end" aria-label="Add founder">
         <div><Label htmlFor="nf-name">New founder name</Label><input id="nf-name" className="field" maxLength={120} value={name} onChange={(e) => setName(e.target.value)} /></div>

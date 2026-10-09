@@ -365,3 +365,22 @@ describe('login form', () => {
     expect(pw).toHaveAttribute('type', 'password');
   });
 });
+
+describe('dashboard preferences from Settings', () => {
+  const empty = { calculatedAt: 'x', currency: { code: 'INR', minorUnits: 2 }, filters: { from: null, to: null, founderId: null, categoryId: null },
+    kpis: { netBusinessPositionMinor: 0, totalInvestmentMinor: 0, founderCapitalMinor: 0, loansMinor: 0, totalBusinessExpensesMinor: 0, reimbursedByBusinessMinor: 0, founderFundedExpensesMinor: 0, refundsMinor: 0, settledMinor: 0, outstandingSettlementsMinor: 0 },
+    founders: [], charts: { contributionByFounder: [], expenseByCategory: [], monthly: [] }, settlement: { recommendations: [], unresolvedMinor: 0 }, recent: [], founderPeriod: [], pendingApprovals: { count: 0 },
+    upcomingRecurring: { items: [], today: '2026-05-10', summary: { activeCount: 0, pausedCount: 0, monthlyCommitmentMinor: 0, overdueCount: 0, dueSoonCount: 0 } },
+    counts: { matchingTransactions: 0, notCountedYet: 0, byStatus: {}, byType: {} }, reconciliation: { status: 'PASS', isBalanced: true, sumNetPositionMinor: 0, businessBorneMinor: 0 }, warnings: 0 };
+
+  it('the saved default period is applied when the URL has none, and "All time" remains an explicit choice', async () => {
+    const calls = mockFetch({ ...meFounder, 'GET /config': { status: 200, body: cfgWith({ dashboard: { defaultPeriod: 'this_year', recentTransactionsCount: 10, upcomingRecurringCount: 5 } }) }, 'GET /dashboard': { status: 200, body: empty } });
+    renderApp('/dashboard');
+    await screen.findByLabelText('Key figures');
+    expect(calls.some((c) => /^GET \/dashboard\?from=\d{4}-01-01&to=\d{4}-12-31$/.test(c))).toBe(true);
+    expect(screen.getByLabelText('Period')).toHaveValue('this_year');
+    await userEvent.selectOptions(screen.getByLabelText('Period'), 'all');
+    await waitFor(() => expect(calls.at(-1)).toBe('GET /dashboard'));
+    expect(screen.getByLabelText('Period')).toHaveValue('all');
+  });
+});
