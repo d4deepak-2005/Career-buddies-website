@@ -128,7 +128,7 @@ describe('founder ledger page', () => {
       ] } } });
     renderApp(`/founders/f1`);
     expect(await screen.findByRole('heading', { name: 'Asha' })).toBeInTheDocument();
-    for (const label of ['Total paid', 'Contribution', 'Loan outstanding', 'Fair share', 'Net position', 'Settled so far', 'Amount receivable', 'Amount payable', 'Outstanding']) {
+    for (const label of ['Total paid', 'Total contribution', 'Loan outstanding', 'Allocated expense share (fair share)', 'Net position', 'Settled so far', 'Amount receivable', 'Amount payable', 'Outstanding']) {
       expect(screen.getByText(label)).toBeInTheDocument();
     }
     expect(screen.getByText(/1,000\.00 paid · .*500\.00 received/)).toBeInTheDocument();

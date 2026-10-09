@@ -11,6 +11,18 @@ type Handler = (url: string, init?: RequestInit) => { status: number; body?: unk
 const need = (category: string, paidBy: string, counterparty: string, split: string, notes: string, method = 'forbidden', linkedExpense = 'forbidden') => ({ category, paidBy, counterparty, split, notes, method, linkedExpense });
 export const configFixture = {
   currency: { code: 'INR', minorUnits: 2 },
+  settings: {
+    business: { displayName: 'CareerBuddies Founder Ledger', shortName: 'CB Founder Ledger', organisationName: 'CareerBuddies' },
+    branding: { hasCustomLogo: false, logoVersion: 0, logoAlt: 'CareerBuddies logo', logoUrl: null },
+    regional: { locale: 'en-US', timeZone: 'Asia/Kolkata' },
+    dashboard: { defaultPeriod: 'all', recentTransactionsCount: 10, upcomingRecurringCount: 5 },
+    approvals: { allowSelfApproval: true, requireRejectionReason: false },
+    settlements: { paymentMethods: ['UPI', 'Bank transfer', 'Cash', 'Cheque'] },
+    recurring: { reminderDaysAhead: 7 },
+    reports: { fiscalYearStartMonth: 4 },
+    version: 1,
+  },
+  imageMaxBytes: 2 * 1024 * 1024,
   receipts: { maxBytes: 5 * 1024 * 1024, allowedExtensions: ['pdf', 'jpg', 'jpeg', 'png'], maxPerTransaction: 10 },
   transactionTypes: [
     { value: 'business_expense', label: 'Business Expense', rules: need('required', 'required', 'forbidden', 'required', 'optional') },

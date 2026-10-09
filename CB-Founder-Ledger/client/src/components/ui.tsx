@@ -1,5 +1,5 @@
 import { AlertCircle, Check, Paperclip } from 'lucide-react';
-import { useEffect, useRef, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { ApiError } from '../lib/api';
 import type { TransactionStatus } from '../lib/types';
 
@@ -10,6 +10,15 @@ const STATUS: Record<TransactionStatus, { label: string; cls: string }> = {
   rejected: { label: 'Rejected', cls: 'bg-danger-soft text-danger' },
   voided: { label: 'Voided', cls: 'bg-ink/10 text-ink-muted line-through' },
 };
+
+/** Founder photograph, or a neutral initials placeholder (never a generated or stock portrait). */
+export function Avatar({ name, photoUrl, size = 'md' }: { name: string; photoUrl?: string | null | undefined; size?: 'sm' | 'md' | 'lg' | 'xl' }) {
+  const [failed, setFailed] = useState(false);
+  const dim = { sm: 'h-8 w-8 text-xs', md: 'h-11 w-11 text-sm', lg: 'h-16 w-16 text-lg', xl: 'h-28 w-28 text-3xl' }[size];
+  const initials = name.split(/\s+/).filter(Boolean).slice(0, 2).map((p) => p[0]!.toUpperCase()).join('');
+  if (photoUrl && !failed) return <img src={photoUrl} alt={`${name}, photograph`} onError={() => setFailed(true)} className={`${dim} shrink-0 rounded-full border border-surface-line object-cover`} />;
+  return <span role="img" aria-label={`${name}, no photograph`} className={`${dim} flex shrink-0 items-center justify-center rounded-full bg-cb-blue/10 font-bold text-cb-blue`}>{initials || '?'}</span>;
+}
 
 export function StatusBadge({ status }: { status: TransactionStatus }) {
   const s = STATUS[status];

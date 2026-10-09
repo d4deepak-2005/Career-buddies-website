@@ -2,10 +2,11 @@
  * Money helpers for DISPLAY and INPUT PARSING only. Amounts travel as integer minor units; every
  * financial rule (splits, totals, validation) is computed by the server.
  */
-export interface CurrencyConfig { code: string; minorUnits: number }
+/** `locale` is a display setting (Settings → Regional); the currency itself is deployment configuration. */
+export interface CurrencyConfig { code: string; minorUnits: number; locale?: string }
 
 export function formatMinor(minor: number, c: CurrencyConfig): string {
-  return new Intl.NumberFormat(undefined, { style: 'currency', currency: c.code, minimumFractionDigits: c.minorUnits, maximumFractionDigits: c.minorUnits }).format(minor / 10 ** c.minorUnits);
+  return new Intl.NumberFormat(c.locale, { style: 'currency', currency: c.code, minimumFractionDigits: c.minorUnits, maximumFractionDigits: c.minorUnits }).format(minor / 10 ** c.minorUnits);
 }
 
 /** "1,234.50" -> 123450. Returns null for anything that is not a plain non-negative amount. */
@@ -36,5 +37,5 @@ export function formatSignedMinor(minor: number, c: CurrencyConfig): string {
 
 /** Display only (chart axis labels): "₹1.2L"-style compact text for a server-provided amount. */
 export function formatCompactMinor(minor: number, c: CurrencyConfig): string {
-  return new Intl.NumberFormat(undefined, { style: 'currency', currency: c.code, notation: 'compact', maximumFractionDigits: 1 }).format(minor / 10 ** c.minorUnits);
+  return new Intl.NumberFormat(c.locale, { style: 'currency', currency: c.code, notation: 'compact', maximumFractionDigits: 1 }).format(minor / 10 ** c.minorUnits);
 }

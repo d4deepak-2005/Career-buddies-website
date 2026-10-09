@@ -39,6 +39,19 @@ async function toError(res: Response): Promise<ApiError> {
   return new ApiError(res.status, body.error?.code ?? 'HTTP_ERROR', body.error?.message ?? `Request failed (${res.status})`, body.error?.details);
 }
 
+/** Upload one file (multipart, field "file") — images and receipts. Same auth/refresh behaviour as `api`. */
+export async function apiUpload<T>(path: string, file: File, method: 'PUT' | 'POST' = 'PUT'): Promise<T> {
+  const send = () => {
+    const fd = new FormData();
+    fd.append('file', file);
+    return fetch(`/api${path}`, { method, credentials: 'include', body: fd });
+  };
+  let res = await send();
+  if (res.status === 401 && (await refreshSession())) res = await send();
+  if (!res.ok) throw await toError(res);
+  return (await res.json()) as T;
+}
+
 export async function api<T>(path: string, init: { method?: string; body?: unknown } = {}): Promise<T> {
   const send = () =>
     fetch(`/api${path}`, {

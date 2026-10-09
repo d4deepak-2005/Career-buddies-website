@@ -7,7 +7,10 @@ import { formatCompactMinor, formatMinor, type CurrencyConfig } from '../../lib/
 import type { DashboardResponse } from '../../lib/types';
 import { monthLabel } from './periods';
 
-export const COLORS = { capital: '#00a63f', loan: '#0052a3', expense: '#002869', invest: '#00a63f', slices: ['#002869', '#0052a3', '#00a63f', '#008040', '#5b8fd1', '#7ac79a', '#8a97ad'] };
+import { brandTokens } from '../../theme/brandTokens';
+
+const c = brandTokens.colors;
+export const COLORS = { capital: c.green, loan: c.blue, expense: c.navy, invest: c.green, slices: brandTokens.chart };
 
 function DataTable({ caption, head, rows }: { caption: string; head: string[]; rows: string[][] }) {
   return (
@@ -54,7 +57,7 @@ export function CategoryDonut({ rows, currency }: { rows: DashboardResponse['cha
   return (
     <div className="flex flex-col items-center gap-4 sm:flex-row sm:items-start">
       <svg viewBox="0 0 42 42" className="h-44 w-44 shrink-0" role="img" aria-label="Expenses by category, donut chart">
-        <circle cx="21" cy="21" r={R} fill="none" stroke="#f4f7fb" strokeWidth="6" />
+        <circle cx="21" cy="21" r={R} fill="none" stroke={c.tint100} strokeWidth="6" />
         {rows.map((r, i) => {
           const len = r.shareBp / 100;
           const el = <circle key={`${r.name}-${i}`} cx="21" cy="21" r={R} fill="none" stroke={COLORS.slices[i % COLORS.slices.length]} strokeWidth="6" strokeDasharray={`${len} ${100 - len}`} strokeDashoffset={25 - offset} />;
@@ -90,11 +93,11 @@ export function MonthlyLines({ rows, currency }: { rows: DashboardResponse['char
       <svg viewBox={`0 0 ${W} ${H}`} className="h-auto w-full" role="img" aria-label="Monthly expenses and investment, line chart">
         {ticks.map((t) => (
           <g key={t}>
-            <line x1={PAD.l} x2={W - PAD.r} y1={y(peak * t)} y2={y(peak * t)} stroke="#e3e9f2" />
-            <text x={PAD.l - 6} y={y(peak * t) + 4} textAnchor="end" fontSize="11" fill="#5b6b86">{formatCompactMinor(Math.round(peak * t), currency)}</text>
+            <line x1={PAD.l} x2={W - PAD.r} y1={y(peak * t)} y2={y(peak * t)} stroke={c.tint300} />
+            <text x={PAD.l - 6} y={y(peak * t) + 4} textAnchor="end" fontSize="11" fill={c.inkMuted}>{formatCompactMinor(Math.round(peak * t), currency)}</text>
           </g>
         ))}
-        {rows.map((r, i) => (i % step === 0 || i === rows.length - 1) && <text key={r.month} x={x(i)} y={H - 8} textAnchor="middle" fontSize="11" fill="#5b6b86">{monthLabel(r.month)}</text>)}
+        {rows.map((r, i) => (i % step === 0 || i === rows.length - 1) && <text key={r.month} x={x(i)} y={H - 8} textAnchor="middle" fontSize="11" fill={c.inkMuted}>{monthLabel(r.month)}</text>)}
         <polyline points={line((r) => r.expensesMinor)} fill="none" stroke={COLORS.expense} strokeWidth="2.5" strokeLinejoin="round" />
         <polyline points={line((r) => r.investmentMinor)} fill="none" stroke={COLORS.invest} strokeWidth="2.5" strokeDasharray="6 4" strokeLinejoin="round" />
         {rows.map((r, i) => <g key={r.month}><circle cx={x(i)} cy={y(r.expensesMinor)} r="3.5" fill={COLORS.expense} /><rect x={x(i) - 3.5} y={y(r.investmentMinor) - 3.5} width="7" height="7" fill={COLORS.invest} /></g>)}

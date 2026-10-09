@@ -5,8 +5,22 @@ export type Need = 'required' | 'optional' | 'forbidden';
 
 export interface TypeRules { category: Need; paidBy: Need; counterparty: Need; split: Need; notes: Need; method: Need; linkedExpense?: Need }
 
+export interface AppSettings {
+  business: { displayName: string; shortName: string; organisationName: string };
+  branding: { hasCustomLogo: boolean; logoVersion: number; logoAlt: string; logoUrl: string | null };
+  regional: { locale: string; timeZone: string };
+  dashboard: { defaultPeriod: 'all' | 'this_month' | 'last_month' | 'last_3_months' | 'this_year'; recentTransactionsCount: number; upcomingRecurringCount: number };
+  approvals: { allowSelfApproval: boolean; requireRejectionReason: boolean };
+  settlements: { paymentMethods: string[] };
+  recurring: { reminderDaysAhead: number };
+  reports: { fiscalYearStartMonth: number };
+  version: number;
+}
+
 export interface AppConfig {
-  currency: { code: string; minorUnits: number };
+  currency: { code: string; minorUnits: number; locale?: string };
+  settings: AppSettings;
+  imageMaxBytes: number;
   receipts: { maxBytes: number; allowedExtensions: string[]; maxPerTransaction: number };
   transactionTypes: Array<{ value: TransactionType; label: string; rules: TypeRules }>;
   transactionStatuses: TransactionStatus[];
@@ -14,8 +28,8 @@ export interface AppConfig {
 }
 
 export interface Named { id: string; name: string }
-export interface Founder { id: string; name: string; email: string | null; userId: string | null; defaultSharePercent: number | null; active: boolean }
-export interface Category { id: string; name: string; slug: string; description: string | null; active: boolean; isDevSeed: boolean }
+export interface Founder { id: string; name: string; email: string | null; userId: string | null; defaultSharePercent: number | null; active: boolean; role?: string | null; displayOrder?: number; hasPhoto?: boolean; photoUrl?: string | null }
+export interface Category { id: string; name: string; slug: string; description: string | null; active: boolean; isDevSeed: boolean; sortOrder?: number }
 
 export interface SplitEntry { founderId: string; founderName: string; percent?: number; shares?: number; amountMinor?: number; note?: string; allocatedMinor: number }
 export interface Split { method: SplitMethod; entries: SplitEntry[] }
@@ -25,6 +39,8 @@ export interface Transaction {
   category: Named | null; paidBy: Named | null; counterparty: Named | null; transactionDate: string; status: TransactionStatus;
   split: Split | null; receiptCount: number;
   /** Option C. A reimbursement points at the expense it reimburses; an expense reports how much is already reimbursed. */
+  decision?: { outcome: 'approved' | 'rejected'; at: string; comment: string | null; by: Named | null } | null;
+  recurringId?: string | null; recurringDueDate?: string | null;
   reimbursesTransactionId?: string | null;
   reimbursesTransaction?: { id: string; txnNumber: string; description: string; amountMinor: number } | null;
   reimbursedMinor?: number | null; remainingReimbursableMinor?: number | null;
@@ -40,7 +56,7 @@ export interface TransactionList { items: Transaction[]; page: number; pageSize:
 /** Everything below is calculated by the server (GET /founders/financial-positions etc.). The client only displays it. */
 export type PositionAction = 'receive' | 'pay' | 'settled';
 export interface FounderPosition {
-  founderId: string; founderName: string; active: boolean;
+  founderId: string; founderName: string; active: boolean; role?: string | null; photoUrl?: string | null; founderFundedExpenseMinor?: number;
   expensePaidMinor: number; refundReceivedMinor: number; reimbursedMinor: number; paidMinor: number;
   contributionMinor: number; loanOutstandingMinor: number; fairShareMinor: number; grossNetPositionMinor: number;
   overSettledMinor: number;
@@ -82,10 +98,10 @@ export interface DashboardResponse {
   filters: { from: string | null; to: string | null; founderId: string | null; categoryId: string | null };
   kpis: {
     totalInvestmentMinor: number; founderCapitalMinor: number; loansMinor: number; totalBusinessExpensesMinor: number; reimbursedByBusinessMinor: number;
-    founderFundedExpensesMinor: number; refundsMinor: number; settledMinor: number; outstandingSettlementsMinor: number;
+    founderFundedExpensesMinor: number; refundsMinor: number; settledMinor: number; outstandingSettlementsMinor: number; netBusinessPositionMinor: number;
   };
   founders: Array<{
-    founderId: string; name: string; active: boolean; contributionMinor: number; loanOutstandingMinor: number; investedMinor: number; paidMinor: number;
+    founderId: string; name: string; active: boolean; role: string | null; photoUrl: string | null; contributionMinor: number; loanOutstandingMinor: number; investedMinor: number; paidMinor: number;
     fairShareMinor: number; netPositionMinor: number; outstandingMinor: number; action: PositionAction; reimbursedMinor: number;
   }>;
   charts: {
@@ -98,7 +114,49 @@ export interface DashboardResponse {
     id: string; txnNumber: string; date: string; type: TransactionType; status: TransactionStatus; description: string; amountMinor: number;
     category: Named | null; paidBy: Named | null; counterparty: Named | null; counted: boolean;
   }>;
-  counts: { matchingTransactions: number; notCountedYet: number };
+  counts: { matchingTransactions: number; notCountedYet: number; byStatus: Record<string, number>; byType: Record<string, number> };
+  pendingApprovals: { count: number };
+  upcomingRecurring: { items: RecurringItem[]; summary: RecurringSummary; today: string };
+  founderPeriod: FounderPeriod[];
   reconciliation: { status: 'PASS' | 'REVIEW' | 'FAIL'; isBalanced: boolean; sumNetPositionMinor: number; businessBorneMinor: number };
   warnings: number;
 }
+
+export interface FounderPeriod {
+  founderId: string; name: string; contributionMinor: number; loanMinor: number; expensePaidMinor: number; reimbursedMinor: number;
+  founderFundedMinor: number; expenseShareMinor: number; refundShareMinor: number; allocatedShareMinor: number;
+}
+
+export type Frequency = 'monthly' | 'quarterly' | 'yearly';
+export type RecurringStatus = 'active' | 'paused' | 'cancelled';
+export interface RecurringItem {
+  id: string; provider: string; description: string | null; amountMinor: number; frequency: Frequency; nextDueDate: string; status: RecurringStatus; notes: string | null; version: number;
+  paidBy: Named; category: Named; splitFounders: Named[]; dueState: 'overdue' | 'due_soon' | 'upcoming' | null;
+}
+export interface RecurringSummary { activeCount: number; pausedCount: number; monthlyCommitmentMinor: number; overdueCount: number; dueSoonCount: number }
+export interface RecurringResponse { today: string; reminderDaysAhead: number; items: RecurringItem[]; summary: RecurringSummary }
+
+export interface ApprovalsResponse extends TransactionList { counts: { pending_approval: number; approved: number; rejected: number } }
+
+export interface AuditItem { id: string; at: string; actor: string; actorId: string | null; action: string; entityType: string; entityId: string | null; summary: string; before: unknown; after: unknown; reason: string | null }
+export interface AuditResponse { page: number; pageSize: number; total: number; items: AuditItem[] }
+
+export interface ReportSummary {
+  calculatedAt: string; currency: { code: string; minorUnits: number }; fiscalYearStartMonth: number;
+  filters: { from: string | null; to: string | null; founderId: string | null; categoryId: string | null; type: string | null };
+  totals: {
+    totalExpensesMinor: number; reimbursedByBusinessMinor: number; founderFundedExpensesMinor: number; refundsMinor: number; founderCapitalMinor: number; loansMinor: number;
+    totalInvestmentMinor: number; settledMinor: number; netBusinessPositionMinor: number; outstandingSettlementsMinor: number;
+  };
+  monthly: DashboardResponse['charts']['monthly'];
+  annual: Array<{ fiscalYear: string; expensesMinor: number; investmentMinor: number }>;
+  categories: DashboardResponse['charts']['expenseByCategory'];
+  founders: Array<DashboardResponse['founders'][number] & Partial<FounderPeriod>>;
+  settlements: Array<{ id: string; txnNumber: string; date: string; status: TransactionStatus; amountMinor: number; payer: string | null; receiver: string | null; method: string | null }>;
+  counts: DashboardResponse['counts']; pendingApprovals: { count: number };
+  reconciliation: DashboardResponse['reconciliation'];
+}
+
+export interface PolicyBlock { label: string; rules: string[] }
+export interface SettingsResponse { settings: AppSettings; currency: { code: string; minorUnits: number }; policy: { reimbursement: PolicyBlock; calculation: PolicyBlock } }
+export interface PublicBranding { displayName: string; shortName: string; organisationName: string; logoUrl: string; logoAlt: string; locale: string }
