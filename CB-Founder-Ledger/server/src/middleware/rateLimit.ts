@@ -1,3 +1,4 @@
+import type { RequestHandler } from 'express';
 import rateLimit from 'express-rate-limit';
 import { getEnv } from '../config/env';
 
@@ -23,4 +24,23 @@ export function writeRateLimiter() {
 /** Receipt uploads: stricter, per IP per 15 minutes. */
 export function uploadRateLimiter() {
   return rateLimit({ windowMs: 15 * 60_000, limit: getEnv().UPLOAD_RATE_LIMIT_MAX, standardHeaders: 'draft-7', legacyHeaders: false, message: tooMany });
+}
+
+const registry: Array<() => RequestHandler> = [];
+
+/**
+ * A limiter that is created once, on first use or earlier via `initRateLimiters()`. Creating a limiter inside a request
+ * handler makes express-rate-limit log ERR_ERL_CREATED_IN_REQUEST_HANDLER; priming them at app start-up avoids that
+ * while keeping one counter per route module and the environment read at creation time (so tests can set limits first).
+ */
+export function deferredLimiter(factory: () => RequestHandler): RequestHandler {
+  let instance: RequestHandler | undefined;
+  const get = () => (instance ??= factory());
+  registry.push(get);
+  return (req, res, next) => get()(req, res, next);
+}
+
+/** Create every deferred limiter now (called from createApp, never from a request). */
+export function initRateLimiters(): void {
+  for (const get of registry) get();
 }

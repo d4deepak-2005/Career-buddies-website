@@ -8,7 +8,7 @@ import { asyncHandler } from '../../lib/asyncHandler';
 import { AppError } from '../../lib/errors';
 import { ALLOWED_IMAGE_EXTENSIONS, detectImageType } from '../../lib/imageType';
 import { authenticate, requireRole } from '../../middleware/auth';
-import { uploadRateLimiter } from '../../middleware/rateLimit';
+import { uploadRateLimiter, deferredLimiter } from '../../middleware/rateLimit';
 import { validate } from '../../middleware/validate';
 import { getBrandingStorage } from '../../storage/brandingStorage';
 import { loadSettings, publicSettings, setLogo, updateSettings } from './settings.service';
@@ -54,8 +54,7 @@ export async function readImageUpload(req: Request, res: Response): Promise<{ bu
   return { buffer: file.buffer, mime: detected.mime, ext: detected.ext };
 }
 
-let limiter: RequestHandler | undefined;
-const limitUploads: RequestHandler = (req, res, next) => (limiter ??= uploadRateLimiter())(req, res, next);
+const limitUploads: RequestHandler = deferredLimiter(uploadRateLimiter);
 
 export const brandingRouter = Router();
 

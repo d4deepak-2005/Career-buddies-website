@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { asyncHandler } from '../../lib/asyncHandler';
 import { AppError } from '../../lib/errors';
 import { authenticate, requireRole } from '../../middleware/auth';
-import { writeRateLimiter } from '../../middleware/rateLimit';
+import { writeRateLimiter, deferredLimiter } from '../../middleware/rateLimit';
 import { validate } from '../../middleware/validate';
 import { receiptsRouter } from '../receipts/receipts.routes';
 import { activeLinkedReimbursements, listReimbursableExpenses } from './reimbursements';
@@ -16,10 +16,7 @@ import * as svc from './transactions.service';
 export const transactionsRouter = Router();
 transactionsRouter.use(authenticate);
 
-const limitWrites: RequestHandler = (() => {
-  let limiter: RequestHandler | undefined;
-  return (req, res, next) => (limiter ??= writeRateLimiter())(req, res, next);
-})();
+const limitWrites: RequestHandler = deferredLimiter(writeRateLimiter);
 
 const parseContent = (v: unknown): TransactionContent => {
   const r = contentSchema.safeParse(v);

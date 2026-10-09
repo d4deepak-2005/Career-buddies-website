@@ -8,7 +8,7 @@ import { ApiError } from '../lib/api';
 import { useBrand } from '../lib/brand';
 
 export function LoginPage() {
-  const { status, login } = useAuth();
+  const { status, login, sessionExpired } = useAuth();
   const location = useLocation();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -63,6 +63,7 @@ export function LoginPage() {
           </div>
           <h1 className="text-2xl font-extrabold text-cb-navy">Welcome Back</h1>
           <p className="mt-1 text-sm text-ink-muted">Sign in to access {brand.displayName}.</p>
+          {sessionExpired && <p role="status" className="mt-4 rounded-xl bg-surface-alt px-4 py-3 text-sm font-semibold text-cb-navy">Your session has expired. Please sign in again.</p>}
 
           <form onSubmit={(e) => void onSubmit(e)} className="mt-6 space-y-4" noValidate>
             <div>

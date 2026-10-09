@@ -189,7 +189,7 @@ export function TransactionsPage({ addOpen = false }: { addOpen?: boolean }) {
               <li key={t.id} className="card p-4">
                 <Link to={`/transactions/${t.id}`} className="block">
                   <div className="flex items-start justify-between gap-3">
-                    <p className="font-bold text-cb-navy">{t.description}</p>
+                    <p className="min-w-0 break-words font-bold text-cb-navy">{t.description}</p>
                     <p className="whitespace-nowrap font-bold tabular-nums">{money(t)}</p>
                   </div>
                   <p className="mt-1 text-xs text-ink-muted">{t.txnNumber} · {t.transactionDate} · {typeLabel(t.type)}</p>

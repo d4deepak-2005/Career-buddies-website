@@ -16,6 +16,12 @@ export class ApiError extends Error {
 
 const AUTH_PATHS = ['/auth/login', '/auth/refresh', '/auth/logout'];
 
+/** Fired when an authenticated request got 401 and the session could not be refreshed (expired or ended elsewhere). */
+export const SESSION_EXPIRED_EVENT = 'cb:session-expired';
+function announceSessionLoss(): void {
+  window.dispatchEvent(new Event(SESSION_EXPIRED_EVENT));
+}
+
 let refreshInFlight: Promise<boolean> | null = null;
 
 /** Single-flight refresh so parallel 401s trigger only one token rotation. */
@@ -47,7 +53,10 @@ export async function apiUpload<T>(path: string, file: File, method: 'PUT' | 'PO
     return fetch(`/api${path}`, { method, credentials: 'include', body: fd });
   };
   let res = await send();
-  if (res.status === 401 && (await refreshSession())) res = await send();
+  if (res.status === 401) {
+    if (await refreshSession()) res = await send();
+    else announceSessionLoss();
+  }
   if (!res.ok) throw await toError(res);
   return (await res.json()) as T;
 }
@@ -62,8 +71,9 @@ export async function api<T>(path: string, init: { method?: string; body?: unkno
     });
 
   let res = await send();
-  if (res.status === 401 && !AUTH_PATHS.includes(path) && (await refreshSession())) {
-    res = await send();
+  if (res.status === 401 && !AUTH_PATHS.includes(path)) {
+    if (await refreshSession()) res = await send();
+    else announceSessionLoss();
   }
   if (!res.ok) throw await toError(res);
   return res.status === 204 ? (undefined as T) : ((await res.json()) as T);

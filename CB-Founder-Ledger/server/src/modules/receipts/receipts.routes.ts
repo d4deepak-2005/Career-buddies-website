@@ -8,7 +8,7 @@ import { asyncHandler } from '../../lib/asyncHandler';
 import { audit } from '../../lib/audit';
 import { AppError } from '../../lib/errors';
 import { ALLOWED_EXTENSIONS, detectReceiptType, sanitizeFileName } from '../../lib/fileType';
-import { uploadRateLimiter } from '../../middleware/rateLimit';
+import { uploadRateLimiter, deferredLimiter } from '../../middleware/rateLimit';
 import { validate } from '../../middleware/validate';
 import { Receipt } from '../../models/Receipt';
 import { Transaction } from '../../models/Transaction';
@@ -24,8 +24,7 @@ const txParams = z.object({ id: objectIdString }).strict();
 const receiptParams = z.object({ id: objectIdString, receiptId: objectIdString }).strict();
 const fileQuery = z.object({ download: z.literal('1').optional() }).strict();
 
-let limiter: RequestHandler | undefined;
-const limitUploads: RequestHandler = (req, res, next) => (limiter ??= uploadRateLimiter())(req, res, next);
+const limitUploads: RequestHandler = deferredLimiter(uploadRateLimiter);
 
 function parseUpload(req: Request, res: Response): Promise<Express.Multer.File> {
   const upload = multer({

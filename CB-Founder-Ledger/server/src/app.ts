@@ -20,6 +20,7 @@ import { foundersRouter } from './modules/founders/founders.routes';
 import { healthRouter } from './modules/health/health.routes';
 import { transactionsRouter } from './modules/transactions/transactions.routes';
 import { usersRouter } from './modules/users/users.routes';
+import { initRateLimiters } from './middleware/rateLimit';
 
 export function createApp(): Express {
   const env = getEnv();
@@ -64,5 +65,7 @@ export function createApp(): Express {
 
   app.use(notFoundHandler);
   app.use(errorHandler);
+  // Create the rate limiters now, at start-up, instead of lazily inside the first request.
+  initRateLimiters();
   return app;
 }

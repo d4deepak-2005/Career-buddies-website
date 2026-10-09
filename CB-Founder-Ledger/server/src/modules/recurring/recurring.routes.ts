@@ -6,7 +6,7 @@ import { asyncHandler } from '../../lib/asyncHandler';
 import { audit } from '../../lib/audit';
 import { AppError } from '../../lib/errors';
 import { authenticate } from '../../middleware/auth';
-import { writeRateLimiter } from '../../middleware/rateLimit';
+import { writeRateLimiter, deferredLimiter } from '../../middleware/rateLimit';
 import { validate } from '../../middleware/validate';
 import { Category } from '../../models/Category';
 import { Founder } from '../../models/Founder';
@@ -37,8 +37,7 @@ const versionBody = z.object({ expectedVersion: z.number().int().min(1) }).stric
 const recordBody = z.object({ dueDate: dateString, transactionDate: dateString.optional(), clientRequestId: z.string().regex(/^[A-Za-z0-9_-]{8,64}$/).optional() }).strict();
 const listQuery = z.object({ status: z.enum(RECURRING_STATUSES).optional() }).strict();
 
-let limiter: RequestHandler | undefined;
-const limitWrites: RequestHandler = (req, res, next) => (limiter ??= writeRateLimiter())(req, res, next);
+const limitWrites: RequestHandler = deferredLimiter(writeRateLimiter);
 
 const conflict = () => new AppError(409, 'VERSION_CONFLICT', 'This recurring payment was changed by someone else. Reload to see the latest version.');
 

@@ -1,6 +1,9 @@
-import { screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { MemoryRouter } from 'react-router-dom';
 import { describe, expect, it } from 'vitest';
+import { App } from './App';
+import { AuthProvider } from './auth/AuthContext';
 import { MODULES } from './lib/modules';
 import { adminUser, founderUser, mockFetch, renderApp, unauth } from './test/utils';
 
@@ -94,5 +97,66 @@ describe('login flow', () => {
     await userEvent.type(screen.getByLabelText('Password'), 'x');
     await userEvent.click(screen.getByRole('button', { name: 'Sign in' }));
     expect(await screen.findByRole('alert')).toHaveTextContent(/Too many attempts/);
+  });
+});
+
+
+describe('session handling', () => {
+  it('goes back to the login page, with a message, when the session expires and cannot be refreshed', async () => {
+    let expired = false;
+    mockFetch({
+      'GET /auth/me': { status: 200, body: { user: founderUser } },
+      'GET /founders/financial-positions': () => (expired ? { status: 401, body: { error: { code: 'UNAUTHORIZED', message: 'Authentication required' } } } : { status: 200, body: { positions: [], excluded: { byStatus: {} }, warnings: [], reconciliation: { status: 'PASS', checks: [] }, currency: { code: 'INR', minorUnits: 2 } } }),
+      'POST /auth/refresh': unauth,
+    });
+    renderApp('/dashboard');
+    await screen.findByRole('heading', { level: 1, name: 'Dashboard' });
+    expired = true; // the cookie lapses while the app is open
+    await userEvent.click(within(screen.getByRole('navigation', { name: 'Main' })).getByRole('link', { name: 'Founders' }));
+    expect(await screen.findByRole('heading', { name: 'Welcome Back' })).toBeInTheDocument();
+    expect(screen.getByText('Your session has expired. Please sign in again.')).toBeInTheDocument();
+    expect(screen.queryByRole('navigation', { name: 'Main' })).not.toBeInTheDocument();
+  });
+
+  it('does not show the "session expired" message to a visitor who was never signed in', async () => {
+    mockFetch({ 'GET /auth/me': unauth, 'POST /auth/refresh': unauth });
+    renderApp('/login');
+    await screen.findByRole('heading', { name: 'Welcome Back' });
+    expect(screen.queryByText(/session has expired/)).not.toBeInTheDocument();
+  });
+
+  it('makes no failing probe requests on the login page when this browser has never signed in', async () => {
+    const calls = mockFetch({});
+    localStorage.removeItem('cb.signedIn');
+    window.history.pushState({}, '', '/login');
+    render(<MemoryRouter initialEntries={['/login']}><AuthProvider><App /></AuthProvider></MemoryRouter>);
+    expect(await screen.findByRole('heading', { name: 'Welcome Back' })).toBeInTheDocument();
+    expect(calls.filter((c) => c.includes('/auth/'))).toEqual([]);
+  });
+
+  it('still asks the server on protected pages even without the hint (existing sessions keep working); a gone session leaves no hint', async () => {
+    const calls = mockFetch({ 'GET /auth/me': unauth, 'POST /auth/refresh': unauth });
+    renderApp('/transactions');
+    expect(await screen.findByRole('heading', { name: 'Welcome Back' })).toBeInTheDocument();
+    expect(calls).toContain('GET /auth/me');
+    expect(localStorage.getItem('cb.signedIn')).toBeNull();
+  });
+
+  it('remembers a successful sign-in so the next visit can restore it', async () => {
+    mockFetch({ 'POST /auth/login': { status: 200, body: { user: adminUser } } });
+    localStorage.removeItem('cb.signedIn');
+    window.history.pushState({}, '', '/login');
+    render(<MemoryRouter initialEntries={['/login']}><AuthProvider><App /></AuthProvider></MemoryRouter>);
+    await userEvent.type(await screen.findByLabelText('Email'), 'a@b.co');
+    await userEvent.type(screen.getByLabelText('Password'), 'passphrase-123');
+    await userEvent.click(screen.getByRole('button', { name: 'Sign in' }));
+    await waitFor(() => expect(localStorage.getItem('cb.signedIn')).toBe('1'));
+  });
+
+  it('restores an existing session on a protected page when the browser has no hint yet (no forced re-login after the update)', async () => {
+    mockFetch({ 'GET /auth/me': { status: 200, body: { user: founderUser } } });
+    renderApp('/dashboard');
+    expect(await screen.findByRole('heading', { level: 1, name: 'Dashboard' })).toBeInTheDocument();
+    expect(localStorage.getItem('cb.signedIn')).toBe('1');
   });
 });

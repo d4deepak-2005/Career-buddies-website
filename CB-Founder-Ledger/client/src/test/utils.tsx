@@ -66,6 +66,8 @@ export function mockFetch(routes: Record<string, Handler | { status: number; bod
 }
 
 export function renderApp(path: string) {
+  localStorage.removeItem('cb.signedIn');
+  window.history.pushState({}, '', '/');
   return render(
     <MemoryRouter initialEntries={[path]}>
       <AuthProvider>

@@ -7,7 +7,7 @@ import { asyncHandler } from '../../lib/asyncHandler';
 import { audit } from '../../lib/audit';
 import { AppError } from '../../lib/errors';
 import { authenticate, requireRole } from '../../middleware/auth';
-import { uploadRateLimiter } from '../../middleware/rateLimit';
+import { uploadRateLimiter, deferredLimiter } from '../../middleware/rateLimit';
 import { validate } from '../../middleware/validate';
 import { FOUNDER_ORDER, Founder } from '../../models/Founder';
 import { getBrandingStorage } from '../../storage/brandingStorage';
@@ -53,8 +53,7 @@ export function publicFounder(f: FounderLike) {
 /** The attributes that matter for the audit trail (never anything secret). */
 const auditView = (f: FounderLike) => ({ name: f.name, role: f.role ?? null, active: f.active, email: f.email ?? null, defaultSharePercent: f.defaultSharePercent ?? null, displayOrder: f.displayOrder ?? 1000, hasPhoto: !!f.photo });
 
-let limiter: RequestHandler | undefined;
-const limitUploads: RequestHandler = (req, res, next) => (limiter ??= uploadRateLimiter())(req, res, next);
+const limitUploads: RequestHandler = deferredLimiter(uploadRateLimiter);
 
 export const foundersRouter = Router();
 foundersRouter.use(authenticate);
