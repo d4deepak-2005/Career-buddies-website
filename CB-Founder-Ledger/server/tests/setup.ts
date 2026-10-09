@@ -14,4 +14,5 @@ process.env['WRITE_RATE_LIMIT_MAX'] = '100000';
 process.env['UPLOAD_RATE_LIMIT_MAX'] = '100000';
 process.env['CURRENCY_CODE'] = 'INR';
 process.env['RECEIPT_MAX_BYTES'] = String(200 * 1024);
+process.env['BRANDING_STORAGE_DIR'] = join(mkdtempSync(join(tmpdir(), 'cb-branding-')), 'store');
 process.env['RECEIPT_STORAGE_DIR'] = join(mkdtempSync(join(tmpdir(), 'cb-receipts-')), 'store');

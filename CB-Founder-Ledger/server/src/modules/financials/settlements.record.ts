@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { asyncHandler } from '../../lib/asyncHandler';
+import { isRealDate } from '../../domain/recurrence';
 import { Transaction } from '../../models/Transaction';
 import { AppError } from '../../lib/errors';
 import { authenticate } from '../../middleware/auth';
@@ -9,7 +10,7 @@ import { amountMinor, objectIdString } from '../transactions/transactions.schema
 import * as svc from '../transactions/transactions.service';
 import { loadCalculation } from './financials.service';
 
-const dateString = z.string().regex(/^\d{4}-\d{2}-\d{2}$/).refine((v) => new Date(`${v}T00:00:00Z`).toISOString().slice(0, 10) === v, 'Enter a valid date');
+const dateString = z.string().refine(isRealDate, 'Enter a valid date (YYYY-MM-DD)');
 
 export const recordSchema = z.object({
   payerFounderId: objectIdString,

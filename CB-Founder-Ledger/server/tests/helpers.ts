@@ -5,7 +5,10 @@ import { createApp } from '../src/app';
 import { getEnv } from '../src/config/env';
 import { connectDb, disconnectDb } from '../src/db/connect';
 import { hashPassword } from '../src/lib/password';
+import { AppSettings } from '../src/models/AppSettings';
+import { AuditEvent } from '../src/models/AuditEvent';
 import { Category } from '../src/models/Category';
+import { RecurringPayment } from '../src/models/RecurringPayment';
 import { Counter } from '../src/models/Counter';
 import { Founder } from '../src/models/Founder';
 import { Receipt } from '../src/models/Receipt';
@@ -48,10 +51,17 @@ export function cookieNames(res: request.Response): string[] {
 
 export const PNG = Buffer.concat([Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]), Buffer.alloc(200, 1)]);
 export const JPG = Buffer.concat([Buffer.from([0xff, 0xd8, 0xff, 0xe0]), Buffer.alloc(200, 2)]);
+/** Minimal buffers that carry the real magic bytes of each image type. */
+export const WEBP = Buffer.concat([Buffer.from('RIFF'), Buffer.from([0x10, 0, 0, 0]), Buffer.from('WEBP'), Buffer.alloc(100, 3)]);
 export const PDF = Buffer.from('%PDF-1.4\n1 0 obj\n<<>>\nendobj\ntrailer\n<<>>\n%%EOF\n');
 
 export async function resetPhase2Data() {
   await rm(getEnv().RECEIPT_STORAGE_DIR, { recursive: true, force: true });
+  await rm(getEnv().BRANDING_STORAGE_DIR, { recursive: true, force: true });
+  // Raw collection access: the audit log and recurring payments deliberately block deletes at the model level.
+  await AuditEvent.collection.deleteMany({});
+  await RecurringPayment.collection.deleteMany({});
+  await AppSettings.deleteMany({});
   await Counter.deleteMany({});
   // Raw collection access: the model deliberately blocks deletes.
   await Transaction.collection.deleteMany({});
