@@ -16,6 +16,10 @@ const schema = z
     ACCESS_TOKEN_TTL_MINUTES: z.coerce.number().int().min(1).max(60).default(15),
     REFRESH_TOKEN_TTL_DAYS: z.coerce.number().int().min(1).max(90).default(7),
     CLIENT_ORIGIN: z.string().url().default('http://localhost:5173'),
+    /** Optional extra browser origins allowed to make state-changing requests (comma-separated), e.g. http://127.0.0.1:8080 for local Docker. */
+    ALLOWED_ORIGINS: z.string().optional().default('')
+      .transform((v) => v.split(',').map((o) => o.trim()).filter(Boolean))
+      .refine((l) => l.every((o) => /^https?:\/\/[^/\s]+$/.test(o)), 'ALLOWED_ORIGINS must be comma-separated origins like http://127.0.0.1:8080'),
     COOKIE_SECURE: booleanString.optional(),
     TRUST_PROXY: z.coerce.number().int().min(0).max(5).default(0),
     BCRYPT_COST: z.coerce.number().int().min(4).max(15).default(12),

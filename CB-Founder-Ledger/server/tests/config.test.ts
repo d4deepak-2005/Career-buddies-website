@@ -14,6 +14,13 @@ describe('environment configuration', () => {
     expect(env.COOKIE_SECURE).toBe(false);
   });
 
+  it('ALLOWED_ORIGINS is optional, comma-separated and validated', () => {
+    expect(parseEnv({ ...base }).ALLOWED_ORIGINS).toEqual([]);
+    expect(parseEnv({ ...base, ALLOWED_ORIGINS: 'http://127.0.0.1:8080, http://localhost:8081' }).ALLOWED_ORIGINS).toEqual(['http://127.0.0.1:8080', 'http://localhost:8081']);
+    expect(() => parseEnv({ ...base, ALLOWED_ORIGINS: 'not-an-origin' })).toThrow(/ALLOWED_ORIGINS/);
+    expect(() => parseEnv({ ...base, ALLOWED_ORIGINS: 'http://a.test/path' })).toThrow(/ALLOWED_ORIGINS/);
+  });
+
   it('defaults cookies to secure in production', () => {
     const env = parseEnv({ ...base, NODE_ENV: 'production' });
     expect(env.COOKIE_SECURE).toBe(true);

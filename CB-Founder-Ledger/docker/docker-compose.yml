@@ -39,6 +39,8 @@ services:
       ACCESS_TOKEN_TTL_MINUTES: ${ACCESS_TOKEN_TTL_MINUTES:-15}
       REFRESH_TOKEN_TTL_DAYS: ${REFRESH_TOKEN_TTL_DAYS:-7}
       CLIENT_ORIGIN: ${CLIENT_ORIGIN:-http://localhost:8080}
+      # Local Docker only: also accept the 127.0.0.1 form of the same host (e.g. ALLOWED_ORIGINS=http://127.0.0.1:8080). Empty = only CLIENT_ORIGIN.
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-}
       # Plain-HTTP local Docker needs false; real deployments behind HTTPS must use true.
       COOKIE_SECURE: ${COOKIE_SECURE:-true}
       TRUST_PROXY: 1

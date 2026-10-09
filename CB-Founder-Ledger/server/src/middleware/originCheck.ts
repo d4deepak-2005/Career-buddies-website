@@ -11,7 +11,9 @@ const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
 export const originCheck: RequestHandler = (req, _res, next) => {
   if (SAFE_METHODS.has(req.method)) return next();
   const origin = req.headers.origin;
-  if (origin && origin !== new URL(getEnv().CLIENT_ORIGIN).origin) {
+  const env = getEnv();
+  const allowed = [new URL(env.CLIENT_ORIGIN).origin, ...env.ALLOWED_ORIGINS.map((o) => new URL(o).origin)];
+  if (origin && !allowed.includes(origin)) {
     return next(new AppError(403, 'BAD_ORIGIN', 'Request origin not allowed'));
   }
   next();
