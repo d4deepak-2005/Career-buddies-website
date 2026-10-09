@@ -30,7 +30,7 @@ describe('brand and settings propagate from the one central configuration', () =
   it('the login page (signed out) shows the public brand name and logo', async () => {
     mockFetch({ 'GET /auth/me': unauth, 'POST /auth/refresh': unauth, 'GET /branding/public': { status: 200, body: { displayName: 'Founders Money Hub', shortName: 'FMH', organisationName: 'CareerBuddies', logoUrl: '/api/branding/logo?v=2', logoAlt: 'Brand logo', locale: 'en-IN' } } });
     renderApp('/login');
-    expect(await screen.findByText(/Founders Money Hub — founders and admins only/)).toBeInTheDocument();
+    expect(await screen.findByText(/Sign in to access Founders Money Hub/)).toBeInTheDocument();
     await waitFor(() => expect(screen.getAllByAltText('Brand logo')[0]).toHaveAttribute('src', '/api/branding/logo?v=2'));
   });
 
@@ -345,7 +345,7 @@ describe('portal entry route', () => {
     unmount();
     mockFetch({ 'GET /auth/me': unauth, 'POST /auth/refresh': unauth });
     renderApp('/ledger');
-    expect(await screen.findByRole('heading', { name: 'Sign in' })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Welcome Back" })).toBeInTheDocument();
   });
 });
 

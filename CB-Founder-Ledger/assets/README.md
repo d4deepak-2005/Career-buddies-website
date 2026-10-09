@@ -19,3 +19,8 @@ docker compose --env-file .env -f docker/docker-compose.yml exec server node dis
 * Alternatively upload them in the app: **Settings → Founders** (photograph) and **Settings → Branding** (logo). That needs no files here.
 * Until you provide a photo, a neutral initials placeholder is shown. The existing official logo stays until you replace it.
 * The folder contents are git-ignored (founder photographs are personal data); only this README is tracked.
+
+## Status (2026-10-09)
+The official logo is committed as the default (`client/public/brand/careerbuddies-logo.png`). Founder photographs are
+**not committed** (private). Copy `nishant-sharma.jpg`, `deepak-sah.jpg`, `divyanshu-gautam.jpg` into `assets/founders/`
+and run `docker compose --env-file .env -f docker/docker-compose.yml exec server node dist/scripts/importBrandAssets.js`.

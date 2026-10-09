@@ -24,7 +24,7 @@ function NavList({ onNavigate, pending }: { onNavigate?: () => void; pending: nu
           onClick={(e) => { if (!confirmLeave()) { e.preventDefault(); return; } onNavigate?.(); }}
           className={({ isActive }) =>
             `flex min-h-11 items-center gap-3 rounded-xl px-3 text-sm font-semibold transition ${
-              isActive && !(path === '/transactions' && location.pathname === '/transactions/new') ? 'bg-white text-cb-navy shadow-card' : 'text-white/80 hover:bg-white/10 hover:text-white'
+              isActive && !(path === '/transactions' && location.pathname === '/transactions/new') ? 'bg-surface-line text-cb-blue' : 'text-ink-muted hover:bg-surface-alt hover:text-cb-navy'
             }`
           }
         >
@@ -42,9 +42,8 @@ function SidebarBody({ onNavigate, pending }: { onNavigate?: () => void; pending
   return (
     <>
       <div className="px-5 pb-3 pt-5">
-        <div className="rounded-2xl bg-white p-3 shadow-card"><BrandLogo className="mx-auto h-20" /></div>
-        <div className="mt-3 h-1 rounded-full bg-brand-accent" aria-hidden />
-        <p className="mt-3 break-words text-sm font-extrabold leading-tight text-white" data-testid="brand-name">{brand.displayName}</p>
+        <BrandLogo className="mx-auto h-16" />
+        <p className="mt-2 break-words text-center text-sm font-extrabold leading-tight text-cb-navy" data-testid="brand-name">{brand.displayName}</p>
       </div>
       <div className="flex-1 overflow-y-auto pt-2">
         <NavList onNavigate={onNavigate} pending={pending} />
@@ -82,7 +81,7 @@ function Shell() {
   return (
     <div className="min-h-screen lg:pl-72">
       {/* Desktop / tablet-landscape sidebar */}
-      <aside className="fixed inset-y-0 left-0 hidden w-72 flex-col bg-brand-gradient lg:flex">
+      <aside className="fixed inset-y-0 left-0 hidden w-72 flex-col border-r border-surface-line bg-white lg:flex">
         <SidebarBody pending={pending} />
       </aside>
 
@@ -90,8 +89,8 @@ function Shell() {
       {open && (
         <div className="fixed inset-0 z-40 lg:hidden" role="dialog" aria-modal="true" aria-label="Navigation menu">
           <button className="absolute inset-0 bg-cb-navy-deep/60" aria-label="Close menu" onClick={() => setOpen(false)} />
-          <div className="absolute inset-y-0 left-0 flex w-[min(20rem,85vw)] flex-col bg-brand-gradient shadow-pop">
-            <button className="btn absolute right-2 top-2 !min-h-10 !px-2 text-white hover:bg-white/10" aria-label="Close menu" onClick={() => setOpen(false)}>
+          <div className="absolute inset-y-0 left-0 flex w-[min(20rem,85vw)] flex-col bg-white shadow-pop">
+            <button className="btn absolute right-2 top-2 !min-h-10 !px-2 text-cb-navy hover:bg-surface-alt" aria-label="Close menu" onClick={() => setOpen(false)}>
               <X className="h-5 w-5" aria-hidden />
             </button>
             <SidebarBody pending={pending} onNavigate={() => setOpen(false)} />

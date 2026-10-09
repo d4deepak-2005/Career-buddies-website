@@ -66,6 +66,13 @@ export function TransactionsPage() {
         <Link to="/transactions/new" className="btn-primary"><PlusCircle className="h-4 w-4" aria-hidden />Add transaction</Link>
       </div>
 
+      <div role="tablist" aria-label="Status quick filter" className="flex gap-1 overflow-x-auto border-b border-surface-line">
+        {([['', 'All'], ['pending_approval', 'Pending'], ['approved', 'Approved'], ['rejected', 'Rejected']] as const).map(([v, label]) => {
+          const on = (params.get('status') ?? '') === v;
+          return <button key={label} type="button" role="tab" aria-selected={on} onClick={() => set({ status: v || null })} className={`min-h-11 whitespace-nowrap border-b-2 px-4 text-sm font-semibold ${on ? 'border-cb-blue text-cb-blue' : 'border-transparent text-ink-muted hover:text-cb-navy'}`}>{label}</button>;
+        })}
+      </div>
+
       <section aria-label="Filters" className="card grid gap-3 p-4 sm:grid-cols-2 lg:grid-cols-4 [&>*]:min-w-0">
         <div className="relative sm:col-span-2">
           <label htmlFor="f-search" className="sr-only">Search transactions</label>

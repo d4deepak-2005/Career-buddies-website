@@ -8,7 +8,7 @@ describe('route protection', () => {
   it('redirects anonymous visitors to the login page', async () => {
     mockFetch({ 'GET /auth/me': unauth, 'POST /auth/refresh': unauth });
     renderApp('/transactions');
-    expect(await screen.findByRole('heading', { name: 'Sign in' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'Welcome Back' })).toBeInTheDocument();
     expect(screen.queryByRole('navigation', { name: 'Main' })).not.toBeInTheDocument();
   });
 

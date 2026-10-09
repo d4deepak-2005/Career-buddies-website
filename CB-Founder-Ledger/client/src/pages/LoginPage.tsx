@@ -48,15 +48,12 @@ export function LoginPage() {
 
   return (
     <div className="grid min-h-screen lg:grid-cols-2">
-      <div className="relative hidden flex-col justify-between overflow-hidden bg-brand-gradient p-12 text-white lg:flex">
-        <div className="w-fit rounded-card bg-white p-4 shadow-pop">
-          <BrandLogo className="h-36" />
-        </div>
-        <div>
+      <div className="relative hidden flex-col overflow-hidden bg-white lg:flex">
+        <div className="flex flex-1 items-center justify-center p-10"><BrandLogo className="h-52" /></div>
+        <div className="bg-brand-gradient px-12 pb-14 pt-16 text-white [clip-path:ellipse(120%_100%_at_0%_100%)]">
           <h2 className="text-4xl font-extrabold leading-tight">{brand.displayName}</h2>
-          <p className="mt-3 max-w-md text-lg text-white/80">A private space for the founders to keep investment, expenses and settlements clear and fair.</p>
+          <p className="mt-3 text-xl text-white/85">Track. Manage. Settle. Together.</p>
         </div>
-        <div className="h-1.5 w-40 rounded-full bg-brand-accent" aria-hidden />
       </div>
 
       <div className="flex items-center justify-center bg-surface-alt p-6">
@@ -64,8 +61,8 @@ export function LoginPage() {
           <div className="mb-6 flex justify-center lg:hidden">
             <BrandLogo className="h-32" />
           </div>
-          <h1 className="text-2xl font-extrabold text-cb-navy">Sign in</h1>
-          <p className="mt-1 text-sm text-ink-muted">{brand.displayName} — founders and admins only.</p>
+          <h1 className="text-2xl font-extrabold text-cb-navy">Welcome Back</h1>
+          <p className="mt-1 text-sm text-ink-muted">Sign in to access {brand.displayName}.</p>
 
           <form onSubmit={(e) => void onSubmit(e)} className="mt-6 space-y-4" noValidate>
             <div>

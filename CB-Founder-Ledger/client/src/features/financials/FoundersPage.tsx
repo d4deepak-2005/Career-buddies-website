@@ -30,29 +30,29 @@ export function FoundersPage() {
         <input id="founder-search" type="search" className="field !pl-10" placeholder="Search founders" value={q} onChange={(e) => setQ(e.target.value)} />
       </div>
       {shown.length === 0 && <p className="rounded-xl bg-surface-alt px-4 py-6 text-center text-sm text-ink-muted">No founder matches “{q}”.</p>}
-      <ul className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3" aria-label="Founder positions">
+      <ul className="grid grid-cols-1 gap-4" aria-label="Founder positions">
         {shown.map((p) => (
           <li key={p.founderId} className="card min-w-0 p-5">
             <div className="flex items-start justify-between gap-3">
               <div className="flex min-w-0 items-center gap-3">
-                <Avatar name={p.founderName} photoUrl={p.photoUrl} size="lg" />
+                <Avatar name={p.founderName} photoUrl={p.photoUrl} size="xl" />
                 <div className="min-w-0">
                   <h2 className="break-words text-lg font-extrabold leading-tight text-cb-navy"><Link to={`/founders/${p.founderId}`} className="hover:underline">{p.founderName}</Link></h2>
-                  {p.role && <p className="text-sm text-ink-muted">{p.role}</p>}
+                  {p.role && <span className="badge mt-1 bg-cb-green/15 text-cb-green-dark">{p.role}</span>}
                   {!p.active && <span className="badge bg-surface-alt text-ink-muted">inactive</span>}
                 </div>
               </div>
               <ActionBadge action={p.action} />
             </div>
             {p.overSettledMinor > 0 && <p className="mt-3 flex items-center gap-1.5 text-xs font-semibold text-danger"><AlertTriangle className="h-3.5 w-3.5" aria-hidden />Over-settled by {m(p.overSettledMinor)}: paid or received more than was due</p>}
-            <dl className="mt-4 grid grid-cols-2 gap-x-4 gap-y-3">
+            <dl className="mt-4 grid grid-cols-2 gap-x-4 gap-y-3 sm:grid-cols-3 lg:grid-cols-4">
+              <Stat label="Contributed" value={m(p.contributionMinor)} />
               <Stat label="Paid" value={m(p.paidMinor)} />
               <Stat label="Fair share" value={m(p.fairShareMinor)} />
               <Stat label="Net position" value={formatSignedMinor(p.grossNetPositionMinor, currency)} tone={p.grossNetPositionMinor > 0 ? 'receive' : p.grossNetPositionMinor < 0 ? 'pay' : undefined} hint="Paid − fair share" />
               <Stat label={p.action === 'pay' ? 'Still to pay' : p.action === 'receive' ? 'Still to receive' : 'Outstanding'} value={m(Math.abs(p.outstandingMinor))} tone={p.action === 'receive' ? 'receive' : p.action === 'pay' ? 'pay' : undefined} hint="Between founders, after settlements" />
               {p.reimbursedMinor > 0 && <Stat label="Reimbursed by business" value={m(p.reimbursedMinor)} hint="Part of your expenses the business paid back; not shared between founders" />}
               {p.founderFundedExpenseMinor !== undefined && <Stat label="Founder-funded expenses" value={m(p.founderFundedExpenseMinor)} hint="Expenses you paid, after business reimbursements" />}
-              <Stat label="Contributed" value={m(p.contributionMinor)} />
               <Stat label="Loan outstanding" value={m(p.loanOutstandingMinor)} />
             </dl>
           </li>

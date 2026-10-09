@@ -169,6 +169,7 @@ ok('dashboard: pending approvals card shows 1', /Pending approvals 1/i.test(awai
 ok('navigation badge shows 1 pending', await page.locator('nav[aria-label=Main] [aria-label="1 pending approvals"]').count() >= 1);
 // approvals page
 await go(page, '/approvals', '[role=tablist]');
+await page.waitForFunction(() => /Pending\s*\d/.test(document.querySelector('[role=tablist]')?.textContent ?? ''), null, { timeout: 8000 }).catch(() => undefined);
 ok('approvals: tab counts', /Pending[^\d]*1/.test(await text(page, '[role=tablist]')), await text(page, '[role=tablist]'));
 await page.click('button[aria-label="Approve TXN-000001"]'); await page.fill('#decision-comment', 'Invoice checked');
 await page.click('[role=dialog] button:has-text("Approve")'); await page.waitForSelector('text=Nothing is waiting for approval');
