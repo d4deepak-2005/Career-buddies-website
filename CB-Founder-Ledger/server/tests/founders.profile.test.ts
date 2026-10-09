@@ -4,7 +4,9 @@ import request from 'supertest';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { createApp } from '../src/app';
 import { FOUNDER_TARGETS, planFounderSeed } from '../src/domain/founderSeed';
+import { runMigrations } from '../src/db/migrations';
 import { AuditEvent } from '../src/models/AuditEvent';
+import { Category } from '../src/models/Category';
 import { Founder } from '../src/models/Founder';
 import { Transaction } from '../src/models/Transaction';
 import { seedFounders } from '../src/scripts/seedFounders';
@@ -52,10 +54,10 @@ describe('mandatory order and roles via seeding (idempotent, no duplicates)', ()
   it('renaming a founder never rewrites accounting: balances and allocations are identical before and after', async () => {
     const created = await w.a.post('/api/transactions').send(expensePayload(w, { amountMinor: 300_000, split: { method: 'equal', entries: [{ founderId: w.f.a }, { founderId: w.f.b }, { founderId: w.f.c }] } }));
     await approve(created.body.transaction.id);
-    const before = (await w.a.get('/api/founders/financial-positions')).body.positions.map((p: Record<string, unknown>) => ({ ...p, founderName: undefined }));
+    const before = (await w.a.get('/api/founders/financial-positions')).body.positions.map((p: Record<string, unknown>) => ({ ...p, founderName: undefined, role: undefined }));
     await seedFounders(() => undefined); // creates the three target founders (none of the test names match)
     await w.admin.patch(`/api/founders/${w.f.a}`).send({ name: 'Renamed Person', role: 'Advisor' });
-    const after = (await w.a.get('/api/founders/financial-positions')).body.positions.filter((p: { founderId: string }) => [w.f.a, w.f.b, w.f.c].includes(p.founderId)).map((p: Record<string, unknown>) => ({ ...p, founderName: undefined }));
+    const after = (await w.a.get('/api/founders/financial-positions')).body.positions.filter((p: { founderId: string }) => [w.f.a, w.f.b, w.f.c].includes(p.founderId)).map((p: Record<string, unknown>) => ({ ...p, founderName: undefined, role: undefined }));
     expect(after).toEqual(before.filter((p: { founderId: string }) => [w.f.a, w.f.b, w.f.c].includes(p.founderId)));
     const tx = (await w.a.get(`/api/transactions/${created.body.transaction.id}`)).body.transaction;
     expect(tx.split.entries.map((e: { allocatedMinor: number }) => e.allocatedMinor)).toEqual([100_000, 100_000, 100_000]);
@@ -139,5 +141,18 @@ describe('profile edits and photographs', () => {
     const f = (await w.a.get('/api/founders')).body.founders;
     expect(f.map((x: { hasPhoto: boolean }) => x.hasPhoto)).toEqual([true, false, false]);
     expect((await w.a.get('/api/config')).body.settings.branding.hasCustomLogo).toBe(true);
+  });
+});
+
+describe('migration for records created before display order existed', () => {
+  it('a legacy founder/category without the new fields sorts AFTER the ordered ones once migrated; running it again changes nothing', async () => {
+    await Founder.deleteMany({});
+    await seedFounders(() => undefined);
+    await Founder.collection.insertOne({ name: 'Legacy Partner', active: true, createdAt: new Date('2020-01-01'), updatedAt: new Date('2020-01-01') }); // no displayOrder, created long ago
+    await Category.collection.insertOne({ name: 'Legacy cat', slug: 'legacy-cat', active: true, isDevSeed: false, createdAt: new Date(), updatedAt: new Date() });
+    expect(await runMigrations()).toEqual({ foundersBackfilled: 1, categoriesBackfilled: 1 });
+    expect(await names()).toEqual(['Nishant Sharma', 'Deepak Sah', 'Divyanshu Gautam', 'Legacy Partner']);
+    expect(await runMigrations()).toEqual({ foundersBackfilled: 0, categoriesBackfilled: 0 });
+    expect((await Category.findOne({ slug: 'legacy-cat' }).lean())!.sortOrder).toBe(1000);
   });
 });

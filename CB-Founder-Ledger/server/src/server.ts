@@ -2,10 +2,12 @@ import 'dotenv/config';
 import { createApp } from './app';
 import { getEnv } from './config/env';
 import { connectDb, disconnectDb } from './db/connect';
+import { runMigrations } from './db/migrations';
 
 async function main() {
   const env = getEnv(); // fails fast on bad configuration
   await connectDb(env.MONGO_URI);
+  await runMigrations(console.log);
   console.log('MongoDB connected');
 
   const server = createApp().listen(env.PORT, () => {

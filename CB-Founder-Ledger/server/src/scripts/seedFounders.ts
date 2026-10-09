@@ -7,11 +7,13 @@
 import 'dotenv/config';
 import { getEnv } from '../config/env';
 import { connectDb, disconnectDb } from '../db/connect';
+import { runMigrations } from '../db/migrations';
 import { planFounderSeed } from '../domain/founderSeed';
 import { audit } from '../lib/audit';
 import { FOUNDER_ORDER, Founder } from '../models/Founder';
 
 export async function seedFounders(log: (m: string) => void = console.log): Promise<number> {
+  await runMigrations(log);
   const existing = await Founder.find().sort(FOUNDER_ORDER).lean();
   const plan = planFounderSeed(existing.map((f) => ({ id: String(f._id), name: f.name, role: f.role ?? null, displayOrder: f.displayOrder ?? null })));
   let changed = 0;
