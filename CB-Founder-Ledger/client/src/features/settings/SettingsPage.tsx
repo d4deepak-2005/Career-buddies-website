@@ -1,54 +1,49 @@
-import { Plus } from 'lucide-react';
-import { useState, type FormEvent } from 'react';
-import { ErrorBox, Label } from '../../components/ui';
-import { ApiError, api } from '../../lib/api';
-import type { Category } from '../../lib/types';
-import { useResource } from '../../lib/useResource';
+import { BarChart3, Building2, CalendarClock, Coins, Handshake, ImageIcon, LayoutDashboard, ListTree, Scale, ShieldCheck, UserCog, Users, type LucideIcon } from 'lucide-react';
+import { useSearchParams } from 'react-router-dom';
+import { useConfirmLeave } from '../../lib/dirty';
+import { CategoriesSection } from './CategoriesSection';
+import { FoundersSection } from './FoundersSection';
+import { ApprovalsSection, BrandingSection, BusinessSection, DashboardSection, PolicySection, RecurringSection, RegionalSection, ReportingSection, SettlementsSection } from './sections';
+import { UsersSection } from './UsersSection';
 
-/** Admin-only (enforced by the API). Phase 2 scope: controlled categories. Other settings come later. */
+const SECTIONS: Array<{ id: string; label: string; icon: LucideIcon; render: () => JSX.Element }> = [
+  { id: 'business', label: 'Business profile', icon: Building2, render: () => <BusinessSection /> },
+  { id: 'branding', label: 'Branding and logo', icon: ImageIcon, render: () => <BrandingSection /> },
+  { id: 'founders', label: 'Founders', icon: Users, render: () => <FoundersSection /> },
+  { id: 'categories', label: 'Expense categories', icon: ListTree, render: () => <CategoriesSection /> },
+  { id: 'regional', label: 'Currency and regional', icon: Coins, render: () => <RegionalSection /> },
+  { id: 'approvals', label: 'Approval rules', icon: ShieldCheck, render: () => <ApprovalsSection /> },
+  { id: 'reimbursement', label: 'Reimbursement rules', icon: Scale, render: () => <PolicySection which="reimbursement" /> },
+  { id: 'settlements', label: 'Settlement preferences', icon: Handshake, render: () => <SettlementsSection /> },
+  { id: 'recurring', label: 'Recurring payments', icon: CalendarClock, render: () => <RecurringSection /> },
+  { id: 'dashboard', label: 'Dashboard display', icon: LayoutDashboard, render: () => <DashboardSection /> },
+  { id: 'users', label: 'User access', icon: UserCog, render: () => <UsersSection /> },
+  { id: 'reporting', label: 'Calculation and reporting', icon: BarChart3, render: () => <ReportingSection /> },
+];
+
+/** Admin-only (enforced by the API). Every control here is backed by a persisted, validated server setting. */
 export function SettingsPage() {
-  const res = useResource<{ categories: Category[] }>('/categories');
-  const [name, setName] = useState('');
-  const [description, setDescription] = useState('');
-  const [error, setError] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
-
-  async function run(fn: () => Promise<unknown>) {
-    setBusy(true); setError(null);
-    try { await fn(); res.reload(); } catch (e) { setError(e instanceof ApiError ? e.message : 'Something went wrong'); } finally { setBusy(false); }
-  }
-  const add = (e: FormEvent) => { e.preventDefault(); void run(async () => { await api('/categories', { method: 'POST', body: { name: name.trim(), ...(description.trim() ? { description: description.trim() } : {}) } }); setName(''); setDescription(''); }); };
-
+  const [params, setParams] = useSearchParams();
+  const confirmLeave = useConfirmLeave();
+  const current = SECTIONS.find((s) => s.id === params.get('section')) ?? SECTIONS[0]!;
   return (
-    <div className="mx-auto max-w-3xl space-y-5">
-      <section className="card p-5 sm:p-6">
-        <h2 className="text-lg font-extrabold text-cb-navy">Categories</h2>
-        <p className="mt-1 text-sm text-ink-muted">Transactions must use one of these. Deactivating a category hides it for new transactions but keeps existing ones intact.</p>
-
-        <form onSubmit={add} className="mt-4 grid gap-3 sm:grid-cols-[1fr_1fr_auto] sm:items-end" aria-label="Add category">
-          <div><Label htmlFor="cat-name">Name</Label><input id="cat-name" className="field" maxLength={80} value={name} onChange={(e) => setName(e.target.value)} /></div>
-          <div><Label htmlFor="cat-desc" hint="(optional)">Description</Label><input id="cat-desc" className="field" maxLength={300} value={description} onChange={(e) => setDescription(e.target.value)} /></div>
-          <button type="submit" className="btn-primary" disabled={busy || !name.trim()}><Plus className="h-4 w-4" aria-hidden />Add</button>
-        </form>
-        {error && <div className="mt-3"><ErrorBox error={error} /></div>}
-
-        {res.loading && !res.data && <p className="mt-4 text-sm text-ink-muted" role="status">Loading…</p>}
-        {res.error && <div className="mt-4"><ErrorBox error={res.error} onRetry={res.reload} /></div>}
-        {res.data && res.data.categories.length === 0 && <p className="mt-4 rounded-xl bg-surface-alt p-4 text-sm text-ink-muted">No categories yet. Add the first one above.</p>}
-        {res.data && res.data.categories.length > 0 && (
-          <ul className="mt-4 divide-y divide-surface-line">
-            {res.data.categories.map((c) => (
-              <li key={c.id} className="flex flex-wrap items-center gap-3 py-3">
-                <div className="min-w-0 flex-1">
-                  <p className="font-semibold text-cb-navy">{c.name} {c.isDevSeed && <span className="badge ml-1 bg-cb-blue/10 text-cb-blue" title="Inserted by the development seed script">dev seed</span>}{!c.active && <span className="badge ml-1 bg-surface-alt text-ink-muted">inactive</span>}</p>
-                  {c.description && <p className="text-xs text-ink-muted">{c.description}</p>}
-                </div>
-                <button className="btn-ghost !min-h-10 border border-surface-line" disabled={busy} onClick={() => void run(() => api(`/categories/${c.id}`, { method: 'PATCH', body: { active: !c.active } }))}>{c.active ? 'Deactivate' : 'Activate'}</button>
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
+    <div className="mx-auto grid max-w-6xl gap-5 lg:grid-cols-[15rem_1fr]">
+      <nav aria-label="Settings sections" className="card h-fit p-2 lg:sticky lg:top-24">
+        <ul className="flex gap-1 overflow-x-auto lg:flex-col lg:overflow-visible">
+          {SECTIONS.map(({ id, label, icon: Icon }) => (
+            <li key={id} className="shrink-0 lg:shrink">
+              <button
+                aria-current={current.id === id ? 'page' : undefined}
+                className={`flex min-h-11 w-full items-center gap-2 whitespace-nowrap rounded-xl px-3 text-left text-sm font-semibold transition ${current.id === id ? 'bg-cb-navy text-white' : 'text-ink-muted hover:bg-surface-alt hover:text-cb-navy'}`}
+                onClick={() => { if (current.id !== id && confirmLeave()) setParams({ section: id }, { replace: true }); }}
+              >
+                <Icon className="h-4 w-4 shrink-0" aria-hidden />{label}
+              </button>
+            </li>
+          ))}
+        </ul>
+      </nav>
+      <div className="min-w-0 space-y-5" key={current.id}>{current.render()}</div>
     </div>
   );
 }

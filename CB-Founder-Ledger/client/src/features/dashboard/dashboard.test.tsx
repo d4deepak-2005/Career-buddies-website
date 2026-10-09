@@ -1,24 +1,25 @@
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import type { DashboardResponse } from '../../lib/types';
 import { categoriesFixture, founderUser, foundersFixture, mockFetch, renderApp } from '../../test/utils';
 import { detectPreset, presetRange } from './periods';
 
 const me = { 'GET /auth/me': { status: 200, body: { user: founderUser } } };
-const zeroKpis = { totalInvestmentMinor: 0, founderCapitalMinor: 0, loansMinor: 0, totalBusinessExpensesMinor: 0, reimbursedByBusinessMinor: 0, founderFundedExpensesMinor: 0, refundsMinor: 0, settledMinor: 0, outstandingSettlementsMinor: 0 };
-const card = (id: string, name: string, over: Partial<DashboardResponse['founders'][number]> = {}): DashboardResponse['founders'][number] => ({ founderId: id, name, active: true, contributionMinor: 0, loanOutstandingMinor: 0, investedMinor: 0, paidMinor: 0, fairShareMinor: 0, netPositionMinor: 0, outstandingMinor: 0, action: 'settled' as const, reimbursedMinor: 0, ...over });
+const zeroKpis = { netBusinessPositionMinor: 0, totalInvestmentMinor: 0, founderCapitalMinor: 0, loansMinor: 0, totalBusinessExpensesMinor: 0, reimbursedByBusinessMinor: 0, founderFundedExpensesMinor: 0, refundsMinor: 0, settledMinor: 0, outstandingSettlementsMinor: 0 };
+const card = (id: string, name: string, over: Partial<DashboardResponse['founders'][number]> = {}): DashboardResponse['founders'][number] => ({ founderId: id, name, active: true, role: null, photoUrl: null, contributionMinor: 0, loanOutstandingMinor: 0, investedMinor: 0, paidMinor: 0, fairShareMinor: 0, netPositionMinor: 0, outstandingMinor: 0, action: 'settled' as const, reimbursedMinor: 0, ...over });
 const empty: DashboardResponse = {
   calculatedAt: 'x', currency: { code: 'INR', minorUnits: 2 }, filters: { from: null, to: null, founderId: null, categoryId: null }, kpis: zeroKpis,
   founders: [], charts: { contributionByFounder: [], expenseByCategory: [], monthly: [] }, settlement: { recommendations: [], unresolvedMinor: 0 }, recent: [],
-  counts: { matchingTransactions: 0, notCountedYet: 0 }, reconciliation: { status: 'PASS', isBalanced: true, sumNetPositionMinor: 0, businessBorneMinor: 0 }, warnings: 0,
+  counts: { matchingTransactions: 0, notCountedYet: 0, byStatus: {}, byType: {} }, pendingApprovals: { count: 0 }, founderPeriod: [],
+  upcomingRecurring: { items: [], summary: { activeCount: 0, pausedCount: 0, monthlyCommitmentMinor: 0, overdueCount: 0, dueSoonCount: 0 }, today: '2026-05-10' }, reconciliation: { status: 'PASS', isBalanced: true, sumNetPositionMinor: 0, businessBorneMinor: 0 }, warnings: 0,
 };
 // Deliberately NOT internally consistent (investment ≠ capital + loans): the UI must show exactly what the server says.
 const full: DashboardResponse = {
   ...empty,
-  kpis: { totalInvestmentMinor: 1_234_500, founderCapitalMinor: 777_700, loansMinor: 250_000, totalBusinessExpensesMinor: 400_000, reimbursedByBusinessMinor: 100_000, founderFundedExpensesMinor: 300_000, refundsMinor: 30_000, settledMinor: 20_000, outstandingSettlementsMinor: 133_333 },
+  kpis: { netBusinessPositionMinor: 555_500, totalInvestmentMinor: 1_234_500, founderCapitalMinor: 777_700, loansMinor: 250_000, totalBusinessExpensesMinor: 400_000, reimbursedByBusinessMinor: 100_000, founderFundedExpensesMinor: 300_000, refundsMinor: 30_000, settledMinor: 20_000, outstandingSettlementsMinor: 133_333 },
   founders: [
-    card('f1', 'Asha', { investedMinor: 500_000, contributionMinor: 500_000, paidMinor: 200_000, fairShareMinor: 66_667, netPositionMinor: 133_333, outstandingMinor: 133_333, action: 'receive', reimbursedMinor: 100_000 }),
+    card('f1', 'Asha', { role: 'Founder', investedMinor: 500_000, contributionMinor: 500_000, paidMinor: 200_000, fairShareMinor: 66_667, netPositionMinor: 133_333, outstandingMinor: 133_333, action: 'receive', reimbursedMinor: 100_000 }),
     card('f2', 'Bilal', { fairShareMinor: 66_667, netPositionMinor: -66_667, outstandingMinor: -66_667, action: 'pay' }),
     card('f3', 'Chen', { fairShareMinor: 66_666, netPositionMinor: -66_666, outstandingMinor: -66_666, action: 'pay' }),
   ],
@@ -32,7 +33,12 @@ const full: DashboardResponse = {
     { id: 't2', txnNumber: 'TXN-000002', date: '2026-05-06', type: 'reimbursement', status: 'approved', description: 'Paid back hosting', amountMinor: 100_000, category: null, paidBy: { id: 'f1', name: 'Asha' }, counterparty: null, counted: true },
     { id: 't1', txnNumber: 'TXN-000001', date: '2026-04-15', type: 'business_expense', status: 'pending_approval', description: 'Cloud hosting', amountMinor: 300_000, category: { id: 'c1', name: 'Software' }, paidBy: { id: 'f1', name: 'Asha' }, counterparty: null, counted: false },
   ],
-  counts: { matchingTransactions: 2, notCountedYet: 1 },
+  counts: { matchingTransactions: 2, notCountedYet: 1, byStatus: { approved: 1, pending_approval: 1 }, byType: {} },
+  pendingApprovals: { count: 3 },
+  upcomingRecurring: { today: '2026-05-10', summary: { activeCount: 2, pausedCount: 0, monthlyCommitmentMinor: 150_000, overdueCount: 1, dueSoonCount: 1 }, items: [
+    { id: 'rc1', provider: 'Cloud Host', description: null, amountMinor: 100_000, frequency: 'monthly', nextDueDate: '2026-05-08', status: 'active', notes: null, version: 1, paidBy: { id: 'f1', name: 'Asha' }, category: { id: 'c1', name: 'Software' }, splitFounders: [], dueState: 'overdue' },
+    { id: 'rc2', provider: 'Design Tool', description: null, amountMinor: 50_000, frequency: 'quarterly', nextDueDate: '2026-05-12', status: 'active', notes: null, version: 1, paidBy: { id: 'f1', name: 'Asha' }, category: { id: 'c1', name: 'Software' }, splitFounders: [], dueState: 'due_soon' },
+  ] },
 };
 const base = { ...me, 'GET /founders': { status: 200, body: { founders: foundersFixture } }, 'GET /categories': { status: 200, body: { categories: categoriesFixture } } };
 const ok = (body: unknown) => ({ status: 200, body });
@@ -42,22 +48,34 @@ describe('dashboard shows server values verbatim', () => {
     mockFetch({ ...base, 'GET /dashboard': ok(full) });
     renderApp('/dashboard');
     const kpis = await screen.findByRole('region', { name: 'Key figures' });
-    expect(within(kpis).getByText('Total investment').parentElement!.parentElement).toHaveTextContent('12,345.00'); // not 7,777 + 2,500: no client arithmetic
-    expect(kpis).toHaveTextContent(/Total business expenses.*4,000\.00/);
-    expect(kpis).toHaveTextContent(/Outstanding settlements.*1,333\.33/);
-    expect(kpis).toHaveTextContent(/Founder capital.*7,777\.00/);
-    expect(within(kpis).getByLabelText('More figures')).toHaveTextContent(/Reimbursed by the business.*1,000\.00/);
+    // The four required KPI cards, exactly as the server returned them (no client arithmetic).
+    expect(kpis).toHaveTextContent(/Total business expenses.*4,000\.00.*1,000\.00 reimbursed by the business/);
+    expect(kpis).toHaveTextContent(/Founder contributions.*7,777\.00.*plus.*2,500\.00 in founder loans/);
+    expect(kpis).toHaveTextContent(/Net business position.*\+.*5,555\.00/); // server says 555,500 even though 12,345 − … would differ: displayed verbatim
+    expect(kpis).toHaveTextContent(/Pending approvals.*3.*Waiting for a decision/);
+    expect(within(kpis).getByRole('link', { name: /Pending approvals/ })).toHaveAttribute('href', '/approvals');
+    const more = within(kpis).getByLabelText('More figures');
+    expect(more).toHaveTextContent(/Total investment.*12,345\.00/); // not 7,777 + 2,500
+    expect(more).toHaveTextContent(/Outstanding settlements.*1,333\.33/);
+    expect(more).toHaveTextContent(/Founder capital.*7,777\.00/);
+    expect(more).toHaveTextContent(/Reimbursed by the business.*1,000\.00/);
+    expect(within(kpis).getByRole('navigation', { name: 'Shortcuts' })).toHaveTextContent(/Add transaction.*Approvals.*Settlements.*Recurring payments.*Reports.*Founders/);
+
+    const upcoming = screen.getByRole('list', { name: 'Upcoming recurring payments' });
+    expect(upcoming).toHaveTextContent(/Cloud Host.*Due 2026-05-08.*Overdue.*1,000\.00/);
+    expect(upcoming).toHaveTextContent(/Design Tool.*Due soon.*500\.00/);
+    expect(screen.getByText(/Monthly commitment/).textContent).toMatch(/1,500\.00 across 2 active payments/);
 
     const cards = within(screen.getByRole('list', { name: 'Founder cards' })).getAllByRole('listitem');
     expect(cards).toHaveLength(3);
-    expect(cards[0]).toHaveTextContent(/Asha.*To receive.*Invested.*5,000\.00.*Fair share.*666\.67.*Net position.*\+.*1,333\.33.*To receive.*1,333\.33/);
+    expect(cards[0]).toHaveTextContent(/Asha.*Founder.*To receive.*Invested.*5,000\.00.*Fair share.*666\.67.*Net position.*\+.*1,333\.33.*To receive.*1,333\.33/);
     expect(cards[1]).toHaveTextContent(/To pay.*−.*666\.67/);
     expect(cards[2]).toHaveTextContent(/−.*666\.66/);
     expect(cards[0]).toHaveTextContent('1,000.00 of their expenses reimbursed by the business');
 
     const rec = within(screen.getByRole('list', { name: 'Recommended payments' })).getAllByRole('listitem');
     expect(rec[0]).toHaveTextContent(/Bilal.*pays.*Asha.*666\.67/);
-    expect(within(rec[0]!).getByRole('link', { name: /Settle/ })).toHaveAttribute('href', '/transactions/new?type=settlement&paidBy=f2&counterparty=f1&amount=66667');
+    expect(within(rec[0]!).getByRole('button', { name: 'Record payment from Bilal to Asha' })).toHaveTextContent('Settle');
 
     expect(screen.getByRole('table', { name: 'Expenses by category' })).toHaveTextContent('Software');
     expect(screen.getByRole('table', { name: 'Monthly expenses and investment' })).toHaveTextContent(/2026-04.*3,000\.00.*5,000\.00/);
@@ -90,6 +108,8 @@ describe('dashboard shows server values verbatim', () => {
 describe('loading, error and empty states', () => {
   it('shows a loading state first', async () => {
     mockFetch({ ...base, 'GET /dashboard': ok(full) });
+    const real = globalThis.fetch; // make the dashboard response slow enough to observe the skeleton deterministically
+    vi.stubGlobal('fetch', (i: RequestInfo | URL, init?: RequestInit) => (String(i).includes('/api/dashboard') ? new Promise((r) => setTimeout(() => r(real(i, init)), 250)) : real(i, init)));
     renderApp('/dashboard');
     expect(await screen.findByRole('status', { name: 'Loading dashboard' })).toBeInTheDocument();
     await screen.findByRole('region', { name: 'Key figures' });

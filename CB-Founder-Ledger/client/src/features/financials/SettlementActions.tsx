@@ -1,7 +1,7 @@
 import { Banknote } from 'lucide-react';
 import { useState } from 'react';
 import { useAuth } from '../../auth/AuthContext';
-import { ConfirmDialog, FieldError, Label, detailsByPath } from '../../components/ui';
+import { ConfirmDialog, Label } from '../../components/ui';
 import { ApiError, api } from '../../lib/api';
 import { useAppConfig } from '../../lib/AppConfigContext';
 import { formatMinor, minorToInput, parseMajorToMinor } from '../../lib/money';
@@ -14,7 +14,7 @@ const today = () => { const d = new Date(); const p = (n: number) => String(n).p
  * Record a settlement payment from a suggestion. A suggestion is not a payment: this creates a PENDING settlement that only counts
  * once it is confirmed (approved). The server rejects self-settlement, duplicates and amounts above what is still owed.
  */
-export function RecordPaymentButton({ payer, receiver, suggestedMinor, onDone }: { payer: Named; receiver: Named; suggestedMinor: number; onDone: (msg: string) => void }) {
+export function RecordPaymentButton({ payer, receiver, suggestedMinor, onDone, label = 'Record payment' }: { payer: Named; receiver: Named; suggestedMinor: number; onDone: (msg: string) => void; label?: string }) {
   const cfg = useAppConfig();
   const [open, setOpen] = useState(false);
   const [amount, setAmount] = useState('');
@@ -25,7 +25,6 @@ export function RecordPaymentButton({ payer, receiver, suggestedMinor, onDone }:
   const [error, setError] = useState<ApiError | null>(null);
   const [requestId, setRequestId] = useState(() => crypto.randomUUID());
   const minor = parseMajorToMinor(amount, cfg.currency.minorUnits);
-  const server = detailsByPath(error);
 
   function show() { setAmount(minorToInput(suggestedMinor, cfg.currency.minorUnits)); setDate(today()); setError(null); setRequestId(crypto.randomUUID()); setOpen(true); }
   async function submit() {
@@ -40,13 +39,13 @@ export function RecordPaymentButton({ payer, receiver, suggestedMinor, onDone }:
 
   return (
     <>
-      <button className="btn-primary !min-h-9 !px-3 text-sm" onClick={show} aria-label={`Record payment from ${payer.name} to ${receiver.name}`}><Banknote className="h-4 w-4" aria-hidden />Record payment</button>
+      <button className="btn-primary !min-h-9 !px-3 text-sm" onClick={show} aria-label={`Record payment from ${payer.name} to ${receiver.name}`}><Banknote className="h-4 w-4" aria-hidden />{label}</button>
       {open && (
         <ConfirmDialog title="Record a settlement payment" confirmLabel="Record payment" busy={busy} onConfirm={() => void submit()} onCancel={() => setOpen(false)}>
           <p><strong>{payer.name}</strong> pays <strong>{receiver.name}</strong>. This is recorded as <em>pending</em> and changes no balance until it is confirmed.</p>
           <div className="mt-4 space-y-3">
-            <div><Label htmlFor="rp-amount">Amount ({cfg.currency.code})</Label><input id="rp-amount" inputMode="decimal" className="field font-bold tabular-nums" value={amount} onChange={(e) => setAmount(e.target.value)} /><FieldError message={server['amountMinor']} /></div>
-            <div><Label htmlFor="rp-date">Payment date</Label><input id="rp-date" type="date" className="field" value={date} onChange={(e) => setDate(e.target.value)} /><FieldError message={server['transactionDate']} /></div>
+            <div><Label htmlFor="rp-amount">Amount ({cfg.currency.code})</Label><input id="rp-amount" inputMode="decimal" className="field font-bold tabular-nums" value={amount} onChange={(e) => setAmount(e.target.value)} /></div>
+            <div><Label htmlFor="rp-date">Payment date</Label><input id="rp-date" type="date" className="field" value={date} onChange={(e) => setDate(e.target.value)} /></div>
             <div><Label htmlFor="rp-method" hint="(optional)">Payment method</Label>
               <select id="rp-method" className="field" value={method} onChange={(e) => setMethod(e.target.value)}><option value="">Not specified</option>{cfg.settings.settlements.paymentMethods.map((x) => <option key={x} value={x}>{x}</option>)}</select></div>
             <div><Label htmlFor="rp-notes" hint="(optional)">Notes</Label><input id="rp-notes" className="field" maxLength={2000} value={notes} onChange={(e) => setNotes(e.target.value)} /></div>

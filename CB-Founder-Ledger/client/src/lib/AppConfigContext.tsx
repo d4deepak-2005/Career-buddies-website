@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, type ReactNode } from 'react';
+import { createContext, useContext, type ReactNode } from 'react';
 import type { AppConfig } from './types';
 import { useResource } from './useResource';
 
@@ -12,7 +12,6 @@ const C = createContext<Ctx | null>(null);
  */
 export function AppConfigProvider({ children }: { children: ReactNode }) {
   const { data, error, loading, reload } = useResource<AppConfig>('/config');
-  useEffect(() => { if (data) document.title = data.settings.business.displayName; }, [data]);
   if (loading && !data) return <div role="status" className="p-8 text-center text-sm text-ink-muted">Loading…</div>;
   if (error && !data) {
     return (

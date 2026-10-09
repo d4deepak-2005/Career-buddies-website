@@ -315,7 +315,7 @@ describe('settings: categories (admin)', () => {
       'GET /categories': { status: 200, body: { categories: [{ ...categoriesFixture[0]!, isDevSeed: true }] } },
       'POST /categories': (_u, init) => { created = body(init); return { status: 201, body: { category: {} } }; },
     });
-    renderApp('/settings');
+    renderApp('/settings?section=categories');
     expect(await screen.findByText('dev seed')).toBeInTheDocument();
     await userEvent.type(screen.getByLabelText('Name'), 'Legal');
     await userEvent.click(screen.getByRole('button', { name: /Add/ }));

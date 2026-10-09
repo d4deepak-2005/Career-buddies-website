@@ -1,5 +1,5 @@
 import { Eye, EyeOff, Lock, Mail } from 'lucide-react';
-import { useState, type FormEvent } from 'react';
+import { useEffect, useState, type FormEvent } from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
 import { BrandLogo } from '../components/BrandLogo';
@@ -17,6 +17,7 @@ export function LoginPage() {
   const [show, setShow] = useState(false);
   const [touched, setTouched] = useState(false);
   const brand = useBrand();
+  useEffect(() => { document.title = `Sign in · ${brand.displayName}`; }, [brand.displayName]);
 
   if (status === 'loading') return <FullScreenLoader />;
   if (status === 'authenticated') {

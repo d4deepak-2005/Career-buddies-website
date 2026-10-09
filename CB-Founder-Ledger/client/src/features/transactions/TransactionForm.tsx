@@ -93,6 +93,8 @@ export function TransactionForm({ existing }: { existing?: Transaction }) {
   const [error, setError] = useState<ApiError | null>(null);
   const [preview, setPreview] = useState<PreviewState>({ loading: false, errors: [], entries: [] });
   const fileInput = useRef<HTMLInputElement>(null);
+  // One token per form: a double click or a retried request can never create the same transaction twice (the server de-duplicates by it).
+  const requestId = useRef(crypto.randomUUID());
   const initialised = useRef(false);
 
   const rules = cfg.transactionTypes.find((t) => t.value === type)!.rules;
@@ -168,7 +170,7 @@ export function TransactionForm({ existing }: { existing?: Transaction }) {
         saved = (await api<{ transaction: Transaction }>(`/transactions/${existing.id}`, { method: 'PATCH', body: patch })).transaction;
       } else {
         for (const [k, v] of Object.entries(optional)) if (v !== undefined) content[k] = v;
-        saved = (await api<{ transaction: Transaction }>('/transactions', { method: 'POST', body: { ...content, status } })).transaction;
+        saved = (await api<{ transaction: Transaction }>('/transactions', { method: 'POST', body: { ...content, status, clientRequestId: requestId.current } })).transaction;
       }
       let notice = existing ? 'Changes saved.' : status === 'draft' ? 'Saved as draft.' : 'Transaction submitted for approval.';
       if (file) {
@@ -260,7 +262,8 @@ export function TransactionForm({ existing }: { existing?: Transaction }) {
         {rules.method !== 'forbidden' && (
           <div>
             <Label htmlFor="method" hint="(optional)">Payment method</Label>
-            <input id="method" className="field" maxLength={50} placeholder="e.g. UPI, bank transfer, cash" value={method} onChange={(e) => setMethod(e.target.value)} />
+            <input id="method" className="field" maxLength={50} list="method-options" placeholder="e.g. UPI, bank transfer, cash" value={method} onChange={(e) => setMethod(e.target.value)} />
+            <datalist id="method-options">{cfg.settings.settlements.paymentMethods.map((x) => <option key={x} value={x} />)}</datalist>
           </div>
         )}
 
