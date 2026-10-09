@@ -186,7 +186,7 @@ const sources = import.meta.glob('./*.tsx', { query: '?raw', import: 'default', 
 describe('G. no financial arithmetic exists in the client', () => {
   it('financial views contain no arithmetic on *Minor values (they only format what the server returns)', () => {
     const files = Object.keys(sources).filter((f) => !f.includes('.test.')).sort();
-    expect(files).toEqual(['./FounderLedgerPage.tsx', './FoundersPage.tsx', './SettlementsPage.tsx', './parts.tsx']);
+    expect(files).toEqual(['./FounderLedgerPage.tsx', './FoundersPage.tsx', './SettlementActions.tsx', './SettlementsPage.tsx', './parts.tsx']);
     for (const f of files) {
       const src = sources[f]!.replace(/\/\/.*$/gm, '');
       const bad = src.match(/Minor\b\s*[-+*/%]\s*[\w.(]|[\w)]\s*[-+*/%]\s*[\w.]*Minor\b/g);

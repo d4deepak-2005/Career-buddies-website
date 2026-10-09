@@ -86,9 +86,9 @@ export interface RecommendationsResponse {
 }
 export interface SettlementSummaryResponse {
   calculatedAt: string;
-  totals: { settledMinor: number; outstandingPayableMinor: number; outstandingReceivableMinor: number; recommendedTransfersMinor: number; businessBorneMinor: number };
+  totals: { settledMinor: number; outstandingPayableMinor: number; outstandingReceivableMinor: number; netSettlementMinor?: number; recommendedTransfersMinor: number; businessBorneMinor: number };
   counts: { official: number; awaitingApproval: number; voidedOrRejected: number; recommendedTransfers: number };
-  history: Array<{ id: string; txnNumber: string; transactionDate: string; status: TransactionStatus; payer: Named | null; receiver: Named | null; amountMinor: number; method: string | null; counted: boolean }>;
+  history: Array<{ id: string; version?: number; txnNumber: string; transactionDate: string; status: TransactionStatus; payer: Named | null; receiver: Named | null; amountMinor: number; method: string | null; counted: boolean }>;
   reconciliation: Reconciliation; warnings: CalcWarning[];
 }
 

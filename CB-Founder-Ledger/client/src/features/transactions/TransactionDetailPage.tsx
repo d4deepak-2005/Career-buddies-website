@@ -8,8 +8,9 @@ import { useAppConfig } from '../../lib/AppConfigContext';
 import { formatMinor } from '../../lib/money';
 import type { HistoryItem, Receipt, Transaction } from '../../lib/types';
 import { useResource } from '../../lib/useResource';
+import { DecisionControls } from '../approvals/DecisionControls';
 
-const ACTION_LABELS: Record<string, string> = { created: 'Created', edited: 'Edited', submitted: 'Submitted for approval', voided: 'Voided', receipt_added: 'Receipt added' };
+const ACTION_LABELS: Record<string, string> = { created: 'Created', edited: 'Edited', submitted: 'Submitted for approval', approved: 'Approved', rejected: 'Rejected', voided: 'Voided', receipt_added: 'Receipt added' };
 const EDITABLE = ['draft', 'pending_approval'];
 const fmtTime = (iso: string) => new Date(iso).toLocaleString();
 
@@ -91,9 +92,12 @@ export function TransactionDetailPage() {
         <div className="mt-4 flex flex-wrap gap-2">
           {canEdit && <Link to={`/transactions/${t.id}/edit`} className="btn-primary"><Pencil className="h-4 w-4" aria-hidden />Edit</Link>}
           {canSubmit && <button className="btn border border-cb-blue text-cb-blue hover:bg-cb-blue/5" disabled={busy} onClick={() => void submitForApproval()}><Send className="h-4 w-4" aria-hidden />Submit for approval</button>}
+          <DecisionControls tx={t} onDone={refresh} />
           {canVoid && <button className="btn border border-danger text-danger hover:bg-danger-soft" disabled={busy} onClick={() => setVoiding(true)}>Void transaction</button>}
           <button className="btn-ghost" onClick={() => navigate('/transactions')}>Back to list</button>
         </div>
+        {t.decision && <p className="mt-4 rounded-xl bg-surface-alt p-3 text-sm"><strong>{t.decision.outcome === 'approved' ? 'Approved' : 'Rejected'}</strong> by {t.decision.by?.name ?? 'unknown'} on {fmtTime(t.decision.at)}{t.decision.comment ? <> — “{t.decision.comment}”</> : null}</p>}
+        {t.recurringDueDate && <p className="mt-4 rounded-xl bg-cb-blue/5 p-3 text-sm text-cb-navy">Recorded from a recurring payment (due {t.recurringDueDate}).</p>}
         {t.status === 'voided' && t.void && (
           <p className="mt-4 rounded-xl bg-surface-alt p-3 text-sm"><strong>Voided</strong> by {t.void.voidedBy?.name ?? 'unknown'} on {fmtTime(t.void.voidedAt)}. Reason: {t.void.reason}</p>
         )}

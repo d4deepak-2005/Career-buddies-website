@@ -79,6 +79,14 @@ brandingRouter.get('/logo', asyncHandler(async (_req, res) => {
   res.redirect(302, '/brand/careerbuddies-logo.png'); // the official asset shipped with the client
 }));
 
+// What the login page needs before anyone is signed in: the product name and logo. Nothing financial.
+brandingRouter.get('/public', asyncHandler(async (_req, res) => {
+  const { values } = await loadSettings();
+  const p = publicSettings({ values, version: 0 });
+  res.setHeader('Cache-Control', 'no-cache');
+  res.json({ displayName: values.business.displayName, shortName: values.business.shortName, organisationName: values.business.organisationName, logoUrl: p.branding.logoUrl ?? '/brand/careerbuddies-logo.png', logoAlt: values.branding.logoAlt, locale: values.regional.locale });
+}));
+
 brandingRouter.put('/logo', authenticate, requireRole('admin'), limitUploads, asyncHandler(async (req, res) => {
   const img = await readImageUpload(req, res);
   const key = `logo-${randomBytes(6).toString('hex')}.${img.ext}`;

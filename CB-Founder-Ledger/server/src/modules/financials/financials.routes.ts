@@ -11,6 +11,12 @@ import { founderHistory, loadCalculation, recommendationsView, settlementSummary
 
 /** Read-only. All financial values are computed by the server; there is nothing a client can submit. */
 const noQuery = z.object({}).strict();
+/** Engine position + presentation fields (role, photograph) + the founder-funded expense amount (expenses paid − reimbursed by the business). */
+export function enrichPosition(l: import('./financials.service').Loaded, p: import('../../domain/calculationEngine').FounderFinancialPosition) {
+  const meta = l.founderMeta.get(p.founderId);
+  return { ...p, role: meta?.role ?? null, photoUrl: meta?.photoUrl ?? null, founderFundedExpenseMinor: p.expensePaidMinor - p.reimbursedMinor };
+}
+
 const currency = () => ({ code: getEnv().CURRENCY_CODE, minorUnits: getEnv().CURRENCY_MINOR_UNITS });
 
 // Mounted BEFORE the Phase 1 founders router so `/financial-positions` is not read as an `:id`.
@@ -18,7 +24,7 @@ export const founderFinancialsRouter = Router();
 
 founderFinancialsRouter.get('/financial-positions', authenticate, validate(noQuery, 'query'), asyncHandler(async (_req, res) => {
   const l = await loadCalculation();
-  res.json({ calculatedAt: l.calculatedAt, currency: currency(), positions: l.result.founders, reconciliation: l.result.reconciliation, included: l.result.included, excluded: l.result.excluded, warnings: l.result.warnings });
+  res.json({ calculatedAt: l.calculatedAt, currency: currency(), positions: l.result.founders.map((p) => enrichPosition(l, p)), reconciliation: l.result.reconciliation, included: l.result.included, excluded: l.result.excluded, warnings: l.result.warnings });
 }));
 
 founderFinancialsRouter.get('/:id/financial-position', authenticate, validate(idParams, 'params'), validate(noQuery, 'query'), asyncHandler(async (req, res) => {
@@ -27,7 +33,7 @@ founderFinancialsRouter.get('/:id/financial-position', authenticate, validate(id
   const position = l.result.founders.find((p) => p.founderId === id);
   if (!position) throw AppError.notFound('Founder not found');
   res.json({
-    calculatedAt: l.calculatedAt, currency: currency(), position, history: founderHistory(l, id), reconciliation: l.result.reconciliation,
+    calculatedAt: l.calculatedAt, currency: currency(), position: enrichPosition(l, position), history: founderHistory(l, id), reconciliation: l.result.reconciliation,
     warnings: l.result.warnings,
   });
 }));

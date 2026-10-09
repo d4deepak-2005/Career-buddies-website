@@ -4,7 +4,7 @@ import { FOUNDER_ORDER, Founder } from '../../models/Founder';
 import { Transaction } from '../../models/Transaction';
 
 interface StoredTx {
-  _id: unknown; txnNumber: string; type: TransactionType; status: TransactionStatus; amountMinor: number; description: string;
+  version?: number; _id: unknown; txnNumber: string; type: TransactionType; status: TransactionStatus; amountMinor: number; description: string;
   transactionDate: Date; method?: string | null; paidByFounderId?: unknown; counterpartyFounderId?: unknown; categoryId?: unknown; reimbursesTransactionId?: unknown;
   split?: { entries: Array<{ founderId: unknown; allocatedMinor: number }> } | null;
 }
@@ -30,7 +30,7 @@ export async function loadCalculation(opts: { asOf?: string } = {}): Promise<Loa
   const [founders, stored] = await Promise.all([
     Founder.find().sort(FOUNDER_ORDER).select('name active role displayOrder photo').lean(),
     Transaction.find()
-      .select('txnNumber type status amountMinor description transactionDate method paidByFounderId counterpartyFounderId categoryId reimbursesTransactionId split.entries.founderId split.entries.allocatedMinor')
+            .select('version txnNumber type status amountMinor description transactionDate method paidByFounderId counterpartyFounderId categoryId reimbursesTransactionId split.entries.founderId split.entries.allocatedMinor')
       .sort({ transactionDate: 1, _id: 1 })
       .lean<StoredTx[]>(),
   ]);
@@ -93,7 +93,7 @@ export function settlementSummary(l: Loaded) {
   const history = l.stored
     .filter((t) => t.type === 'settlement')
     .map((t) => ({
-      id: String(t._id), txnNumber: t.txnNumber, transactionDate: t.transactionDate.toISOString().slice(0, 10), status: t.status,
+      id: String(t._id), version: t.version ?? 1, txnNumber: t.txnNumber, transactionDate: t.transactionDate.toISOString().slice(0, 10), status: t.status,
       payer: named(l.names, idOrNull(t.paidByFounderId)), receiver: named(l.names, idOrNull(t.counterpartyFounderId)),
       amountMinor: t.amountMinor, method: t.method ?? null, counted: official.has(String(t._id)),
     }))
@@ -105,6 +105,8 @@ export function settlementSummary(l: Loaded) {
       settledMinor: countedTotal,
       outstandingPayableMinor: r.totalPayableMinor,
       outstandingReceivableMinor: r.totalReceivableMinor,
+      /** Receivable − payable across founders. Zero when the books balance (always, under Option C). */
+      netSettlementMinor: r.totalReceivableMinor - r.totalPayableMinor,
       recommendedTransfersMinor: r.recommendedTotalMinor,
       /** Reimbursed by the business (linked reimbursements). Business-borne: not recoverable from founders and not a balance. */
       businessBorneMinor: r.businessBorneMinor,
