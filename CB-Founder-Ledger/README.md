@@ -46,7 +46,7 @@ SMOKE_ADMIN_EMAIL=<seed email> SMOKE_ADMIN_PASSWORD=<seed password> npm run dock
 docker compose --env-file .env -f docker/docker-compose.yml down        # add -v to also delete the database volume
 ```
 
-The app is then at `http://localhost:8080`. To also open it as `http://127.0.0.1:8080`, add `ALLOWED_ORIGINS=http://127.0.0.1:8080` to `.env` (state-changing requests are origin-checked, so a second host name must be allowed explicitly; the default allows only `CLIENT_ORIGIN`). The stack runs on the machine where you run these commands — a URL like `localhost:8080` is only reachable from that same machine.
+The app is then at `http://localhost:8080` (Windows users: step-by-step PowerShell guide in [`docs/WINDOWS-LOCAL-SETUP.md`](docs/WINDOWS-LOCAL-SETUP.md)). To also open it as `http://127.0.0.1:8080`, add `ALLOWED_ORIGINS=http://127.0.0.1:8080` to `.env` (state-changing requests are origin-checked, so a second host name must be allowed explicitly; the default allows only `CLIENT_ORIGIN`). The stack runs on the machine where you run these commands — a URL like `localhost:8080` is only reachable from that same machine.
 
 MongoDB is not published to the host. Behind HTTPS in production keep `NODE_ENV=production` and `COOKIE_SECURE=true` (the API refuses insecure cookies in production). If your network re-signs TLS (corporate proxy), build with `NODE_IMAGE=<your node image that trusts the CA>` in `.env`.
 
