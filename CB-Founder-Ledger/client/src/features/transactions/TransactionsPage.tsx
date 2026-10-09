@@ -1,6 +1,7 @@
 import { ArrowDown, ArrowUp, ChevronLeft, ChevronRight, PlusCircle, Search, X } from 'lucide-react';
 import { useEffect, useState } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { Link, useLocation, useSearchParams } from 'react-router-dom';
+import { TransactionModal } from './TransactionModal';
 import { ErrorBox, ReceiptIndicator, StatusBadge } from '../../components/ui';
 import { useAppConfig } from '../../lib/AppConfigContext';
 import { formatMinor } from '../../lib/money';
@@ -21,8 +22,10 @@ function SortHeader({ field, label, sort, order, onSort, align = 'left' }: { fie
   );
 }
 
-export function TransactionsPage() {
+export function TransactionsPage({ addOpen = false }: { addOpen?: boolean }) {
   const cfg = useAppConfig();
+  const location = useLocation();
+  const savedNotice = (location.state as { notice?: string } | null)?.notice;
   const [params, setParams] = useSearchParams();
   const founders = useResource<{ founders: Founder[] }>('/founders');
   const categories = useResource<{ categories: Category[] }>('/categories');
@@ -49,6 +52,9 @@ export function TransactionsPage() {
   const qs = new URLSearchParams(params);
   qs.set('sort', sort); qs.set('order', order); qs.set('page', String(page));
   const list = useResource<TransactionList>(`/transactions?${qs.toString()}`);
+  const { reload } = list;
+  const savedAt = (location.state as { saved?: number } | null)?.saved;
+  useEffect(() => { if (savedAt) reload(); }, [savedAt, reload]);
 
   const onSort = (field: string) => set({ sort: field, order: sort === field && order === 'desc' ? 'asc' : 'desc' });
   const hasFilters = FILTER_KEYS.some((k) => params.get(k)) || !!params.get('search');
@@ -61,6 +67,8 @@ export function TransactionsPage() {
   const select = 'field !min-h-10 !py-0';
   return (
     <div className="space-y-4">
+      {addOpen && <TransactionModal />}
+      {savedNotice && <p role="status" className="rounded-xl bg-cb-green/10 px-4 py-3 text-sm font-semibold text-cb-green-dark">{savedNotice}</p>}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <p className="text-sm text-ink-muted">Every recorded transaction. Voided entries stay visible for the audit trail.</p>
         <Link to="/transactions/new" className="btn-primary"><PlusCircle className="h-4 w-4" aria-hidden />Add transaction</Link>

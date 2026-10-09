@@ -1,4 +1,4 @@
-import { screen, waitFor, within } from '@testing-library/react';
+import { act, fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
 import type { Transaction } from '../../lib/types';
@@ -58,41 +58,46 @@ describe('transactions list', () => {
 });
 
 describe('add transaction form', () => {
+  // The form lives in a dialog over the list, which has its own filter controls with similar labels.
+  const d = () => within(screen.getByRole('dialog', { name: 'Add Transaction' }));
   it('renders all seven types, the required fields and obvious founder choice', async () => {
     mockFetch(me(founderUser));
     renderApp('/transactions/new');
-    const types = await screen.findByRole('radiogroup', { name: 'Transaction type' });
+    await screen.findByRole('dialog', { name: 'Add Transaction' });
+    const types = await d().findByRole('radiogroup', { name: 'Transaction type' });
     expect(within(types).getAllByRole('radio').map((r) => r.textContent)).toEqual(['Business Expense', 'Founder Contribution', 'Founder Loan', 'Reimbursement', 'Settlement', 'Refund', 'Other']);
-    expect(screen.getByLabelText(/Amount \(INR\)/)).toBeInTheDocument();
-    expect(screen.getByLabelText('Description')).toBeInTheDocument();
-    expect(screen.getByLabelText('Category')).toBeInTheDocument();
-    const paid = screen.getByRole('radiogroup', { name: 'Paid by' });
+    expect(d().getByLabelText(/Amount \(INR\)/)).toBeInTheDocument();
+    expect(d().getByLabelText('Description')).toBeInTheDocument();
+    expect(d().getByLabelText('Category')).toBeInTheDocument();
+    const paid = d().getByRole('radiogroup', { name: 'Paid by' });
     expect(within(paid).getAllByRole('radio')).toHaveLength(3);
     await waitFor(() => expect(within(paid).getByRole('radio', { name: /Asha/ })).toBeChecked()); // defaults to the signed-in founder
-    expect(screen.getByRole('radiogroup', { name: 'Split method' })).toBeInTheDocument();
-    expect(within(screen.getByRole('radiogroup', { name: 'Split method' })).getAllByRole('radio').map((r) => r.textContent)).toEqual(['Equal', 'Percentage', 'Exact amount', 'Shares', 'Custom']);
+    expect(d().getByRole('radiogroup', { name: 'Split method' })).toBeInTheDocument();
+    expect(within(d().getByRole('radiogroup', { name: 'Split method' })).getAllByRole('radio').map((r) => r.textContent)).toEqual(['Equal', 'Percentage', 'Exact amount', 'Shares', 'Custom']);
   });
 
   it('shows immediate, helpful validation without calling the API', async () => {
     const calls = mockFetch(me(founderUser));
     renderApp('/transactions/new');
-    await screen.findByLabelText('Description');
-    await userEvent.click(screen.getByRole('button', { name: 'Submit for approval' }));
-    expect(await screen.findByText(/Enter a valid amount greater than 0/)).toBeInTheDocument();
-    expect(screen.getByText('Add a short description')).toBeInTheDocument();
-    expect(screen.getByText('Choose a category')).toBeInTheDocument();
+    await screen.findByRole('dialog', { name: 'Add Transaction' });
+    await d().findByLabelText('Description');
+    await userEvent.click(d().getByRole('button', { name: 'Save Transaction' }));
+    expect(await d().findByText(/Enter a valid amount greater than 0/)).toBeInTheDocument();
+    expect(d().getByText('Add a short description')).toBeInTheDocument();
+    expect(d().getByText('Choose a category')).toBeInTheDocument();
     expect(calls.filter((c) => c.startsWith('POST /transactions'))).toEqual([]);
   });
 
   it('adapts to the type using server-provided rules (settlement: receiver, no split)', async () => {
     mockFetch(me(founderUser));
     renderApp('/transactions/new');
-    await userEvent.click(await screen.findByRole('radio', { name: 'Settlement' }));
-    expect(screen.getByRole('radiogroup', { name: 'Who received the money?' })).toBeInTheDocument();
-    expect(screen.queryByRole('radiogroup', { name: 'Split method' })).not.toBeInTheDocument();
-    await userEvent.click(screen.getByRole('radio', { name: 'Other' }));
-    expect(screen.getByLabelText('Split this between founders')).toBeInTheDocument(); // optional for "other"
-    expect(screen.queryByRole('radiogroup', { name: 'Who received the money?' })).not.toBeInTheDocument();
+    await screen.findByRole('dialog', { name: 'Add Transaction' });
+    await userEvent.click(await d().findByRole('radio', { name: 'Settlement' }));
+    expect(d().getByRole('radiogroup', { name: 'Who received the money?' })).toBeInTheDocument();
+    expect(d().queryByRole('radiogroup', { name: 'Split method' })).not.toBeInTheDocument();
+    await userEvent.click(d().getByRole('radio', { name: 'Other' }));
+    expect(d().getByLabelText('Split this between founders')).toBeInTheDocument(); // optional for "other"
+    expect(d().queryByRole('radiogroup', { name: 'Who received the money?' })).not.toBeInTheDocument();
   });
 
   it('previews the split via the server and shows its validation messages', async () => {
@@ -108,18 +113,19 @@ describe('add transaction form', () => {
       },
     });
     renderApp('/transactions/new');
-    await userEvent.type(await screen.findByLabelText(/Amount/), '1500');
-    expect(await screen.findByLabelText('Asha pays')).toHaveTextContent(/500\.00/);
+    await screen.findByRole('dialog', { name: 'Add Transaction' });
+    await userEvent.type(await d().findByLabelText(/Amount/), '1500');
+    expect(await d().findByLabelText('Asha pays')).toHaveTextContent(/500\.00/);
     expect(previews[0]).toEqual({ amountMinor: 150000, split: { method: 'equal', entries: [{ founderId: 'f1' }, { founderId: 'f2' }, { founderId: 'f3' }] } });
 
-    await userEvent.click(screen.getByRole('radio', { name: 'Percentage' }));
-    await userEvent.type(await screen.findByLabelText('Percent for Asha'), '50');
-    await userEvent.type(screen.getByLabelText('Percent for Bilal'), '0');
-    expect(screen.getByText('Enter a percentage for Chen.')).toBeInTheDocument();
-    await userEvent.click(screen.getByRole('checkbox', { name: 'Include Chen' }));
-    expect(await screen.findByText('Percentages must add up to 100% (currently 50%)')).toBeInTheDocument();
-    await userEvent.click(screen.getByRole('button', { name: 'Submit for approval' }));
-    expect((await screen.findAllByRole('alert')).length).toBeGreaterThan(0);
+    await userEvent.click(d().getByRole('radio', { name: 'Percentage' }));
+    await userEvent.type(await d().findByLabelText('Percent for Asha'), '50');
+    await userEvent.type(d().getByLabelText('Percent for Bilal'), '0');
+    expect(d().getByText('Enter a percentage for Chen.')).toBeInTheDocument();
+    await userEvent.click(d().getByRole('checkbox', { name: 'Include Chen' }));
+    expect(await d().findByText('Percentages must add up to 100% (currently 50%)')).toBeInTheDocument();
+    await userEvent.click(d().getByRole('button', { name: 'Save Transaction' }));
+    expect((await d().findAllByRole('alert')).length).toBeGreaterThan(0);
   });
 
   it('creates a transaction with integer minor units and opens it', async () => {
@@ -132,11 +138,13 @@ describe('add transaction form', () => {
       'GET /transactions/t1/history': { status: 200, body: { history: [] } },
     });
     renderApp('/transactions/new');
-    await userEvent.type(await screen.findByLabelText(/Amount/), '1,500.50');
-    await userEvent.type(screen.getByLabelText('Description'), '  Hosting  ');
-    await userEvent.selectOptions(screen.getByLabelText('Category'), 'c1');
-    await userEvent.click(screen.getByRole('button', { name: 'Submit for approval' }));
-    expect(await screen.findByRole('heading', { name: 'Cloud hosting' })).toBeInTheDocument();
+    await screen.findByRole('dialog', { name: 'Add Transaction' });
+    await userEvent.type(await d().findByLabelText(/Amount/), '1,500.50');
+    await userEvent.type(d().getByLabelText('Description'), '  Hosting  ');
+    await userEvent.selectOptions(d().getByLabelText('Category'), 'c1');
+    await userEvent.click(d().getByRole('button', { name: 'Save Transaction' }));
+    expect(await screen.findByText('Transaction submitted for approval.')).toBeInTheDocument();
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     expect(posted).toMatchObject({ type: 'business_expense', amountMinor: 150050, description: 'Hosting', categoryId: categoriesFixture[0]!.id, paidByFounderId: 'f1', status: 'pending_approval', split: { method: 'equal' } });
     expect(typeof (posted as unknown as { amountMinor: unknown }).amountMinor).toBe('number');
   });
@@ -149,15 +157,16 @@ describe('add transaction form', () => {
     it('a reimbursement requires choosing the expense; the picker lists only that founder\'s reimbursable expenses', async () => {
       const calls = mockFetch({ ...me(founderUser), 'GET /transactions/reimbursable-expenses': { status: 200, body: { expenses } } });
       renderApp('/transactions/new');
-      await userEvent.click(await screen.findByRole('radio', { name: 'Reimbursement' }));
-      expect(screen.getByRole('radiogroup', { name: 'Expense being reimbursed' })).toBeInTheDocument();
-      expect(await screen.findByRole('radio', { name: /TXN-000001.*Cloud hosting/ })).toBeInTheDocument();
-      expect(screen.getByRole('radio', { name: /TXN-000002.*Up to .*300\.00/ })).toBeInTheDocument();
+    await screen.findByRole('dialog', { name: 'Add Transaction' });
+      await userEvent.click(await d().findByRole('radio', { name: 'Reimbursement' }));
+      expect(d().getByRole('radiogroup', { name: 'Expense being reimbursed' })).toBeInTheDocument();
+      expect(await d().findByRole('radio', { name: /TXN-000001.*Cloud hosting/ })).toBeInTheDocument();
+      expect(d().getByRole('radio', { name: /TXN-000002.*Up to .*300\.00/ })).toBeInTheDocument();
       expect(calls.some((c) => c.startsWith('GET /transactions/reimbursable-expenses?paidByFounderId=f1'))).toBe(true);
-      await userEvent.type(screen.getByLabelText(/Amount/), '100');
-      await userEvent.type(screen.getByLabelText('Description'), 'Paid back');
-      await userEvent.click(screen.getByRole('button', { name: 'Submit for approval' }));
-      expect(await screen.findByText('Choose the expense this reimburses')).toBeInTheDocument();
+      await userEvent.type(d().getByLabelText(/Amount/), '100');
+      await userEvent.type(d().getByLabelText('Description'), 'Paid back');
+      await userEvent.click(d().getByRole('button', { name: 'Save Transaction' }));
+      expect(await d().findByText('Choose the expense this reimburses')).toBeInTheDocument();
       expect(calls.filter((c) => c === 'POST /transactions')).toEqual([]);
     });
     it('sends only the link id (no financial values from the client) and shows server errors such as over-reimbursement', async () => {
@@ -168,20 +177,22 @@ describe('add transaction form', () => {
         'POST /transactions': (_u, init) => { posted = body(init); return { status: 400, body: { error: { code: 'REIMBURSEMENT_EXCEEDS_EXPENSE', message: 'This reimbursement would take the total reimbursed above the expense amount', details: [{ path: 'amountMinor', code: 'REIMBURSEMENT_EXCEEDS_EXPENSE', message: 'This reimbursement would take the total reimbursed above the expense amount', remainingMinor: 100_000 }] } } }; },
       });
       renderApp('/transactions/new');
-      await userEvent.click(await screen.findByRole('radio', { name: 'Reimbursement' }));
-      await userEvent.click(await screen.findByRole('radio', { name: /TXN-000001/ }));
-      await userEvent.type(screen.getByLabelText(/Amount/), '2500');
-      await userEvent.type(screen.getByLabelText('Description'), 'Paid back');
-      await userEvent.click(screen.getByRole('button', { name: 'Submit for approval' }));
-      expect((await screen.findAllByText(/above the expense amount/)).length).toBeGreaterThan(0);
+    await screen.findByRole('dialog', { name: 'Add Transaction' });
+      await userEvent.click(await d().findByRole('radio', { name: 'Reimbursement' }));
+      await userEvent.click(await d().findByRole('radio', { name: /TXN-000001/ }));
+      await userEvent.type(d().getByLabelText(/Amount/), '2500');
+      await userEvent.type(d().getByLabelText('Description'), 'Paid back');
+      await userEvent.click(d().getByRole('button', { name: 'Save Transaction' }));
+      expect((await d().findAllByText(/above the expense amount/)).length).toBeGreaterThan(0);
       expect(posted).toMatchObject({ type: 'reimbursement', amountMinor: 250_000, reimbursesTransactionId: 'e1', paidByFounderId: 'f1' });
       expect(Object.keys(posted as unknown as object)).not.toEqual(expect.arrayContaining(['fairShareMinor', 'reimbursedMinor']));
     });
     it('no approved expenses left -> explains instead of showing an empty list', async () => {
       mockFetch({ ...me(founderUser), 'GET /transactions/reimbursable-expenses': { status: 200, body: { expenses: [] } } });
       renderApp('/transactions/new');
-      await userEvent.click(await screen.findByRole('radio', { name: 'Reimbursement' }));
-      expect(await screen.findByText(/no approved expenses left to reimburse/)).toBeInTheDocument();
+    await screen.findByRole('dialog', { name: 'Add Transaction' });
+      await userEvent.click(await d().findByRole('radio', { name: 'Reimbursement' }));
+      expect(await d().findByText(/no approved expenses left to reimburse/)).toBeInTheDocument();
     });
   });
 
@@ -190,20 +201,22 @@ describe('add transaction form', () => {
       let posted: Record<string, unknown> | null = null;
       mockFetch({ ...me(founderUser), 'POST /transactions': (_u, init) => { posted = body(init); return { status: 201, body: { transaction: tx({ type: 'settlement' }) } }; }, 'GET /transactions/t1': { status: 200, body: { transaction: tx(), receipts: [] } }, 'GET /transactions/t1/history': { status: 200, body: { history: [] } } });
       renderApp('/transactions/new?type=settlement&paidBy=f2&counterparty=f1&amount=66667');
-      expect(await screen.findByLabelText(/Amount/)).toHaveValue('666.67');
-      expect(screen.getByRole('radio', { name: 'Settlement' })).toHaveAttribute('aria-checked', 'true');
-      await waitFor(() => expect(within(screen.getByRole('radiogroup', { name: 'Who paid?' })).getByRole('radio', { name: /Bilal/ })).toHaveAttribute('aria-checked', 'true'));
-      await waitFor(() => expect(within(screen.getByRole('radiogroup', { name: 'Who received the money?' })).getByRole('radio', { name: /Asha/ })).toHaveAttribute('aria-checked', 'true'));
-      await userEvent.click(screen.getByRole('button', { name: 'Submit for approval' }));
-      await screen.findByRole('heading', { name: 'Cloud hosting' });
+    await screen.findByRole('dialog', { name: 'Add Transaction' });
+      expect(await d().findByLabelText(/Amount/)).toHaveValue('666.67');
+      expect(d().getByRole('radio', { name: 'Settlement' })).toHaveAttribute('aria-checked', 'true');
+      await waitFor(() => expect(within(d().getByRole('radiogroup', { name: 'Who paid?' })).getByRole('radio', { name: /Bilal/ })).toHaveAttribute('aria-checked', 'true'));
+      await waitFor(() => expect(within(d().getByRole('radiogroup', { name: 'Who received the money?' })).getByRole('radio', { name: /Asha/ })).toHaveAttribute('aria-checked', 'true'));
+      await userEvent.click(d().getByRole('button', { name: 'Save Transaction' }));
+      expect(await screen.findByText('Transaction submitted for approval.')).toBeInTheDocument();
       expect(posted).toMatchObject({ type: 'settlement', amountMinor: 66667, paidByFounderId: 'f2', counterpartyFounderId: 'f1', status: 'pending_approval' });
     });
     it('ignores malformed or unknown prefill values', async () => {
       mockFetch(me(founderUser));
       renderApp('/transactions/new?type=settlement&paidBy=zzz&counterparty=yyy&amount=1e9');
-      await screen.findByLabelText(/Amount/);
-      expect(screen.getByLabelText(/Amount/)).toHaveValue('');
-      expect(screen.getByRole('radio', { name: 'Business Expense' })).toHaveAttribute('aria-checked', 'true');
+    await screen.findByRole('dialog', { name: 'Add Transaction' });
+      await d().findByLabelText(/Amount/);
+      expect(d().getByLabelText(/Amount/)).toHaveValue('');
+      expect(d().getByRole('radio', { name: 'Business Expense' })).toHaveAttribute('aria-checked', 'true');
     });
   });
 
@@ -214,11 +227,12 @@ describe('add transaction form', () => {
       'POST /transactions': { status: 400, body: { error: { code: 'VALIDATION_ERROR', message: 'Transaction validation failed', details: [{ path: 'categoryId', message: 'Category is inactive' }] } } },
     });
     renderApp('/transactions/new');
-    await userEvent.type(await screen.findByLabelText(/Amount/), '10');
-    await userEvent.type(screen.getByLabelText('Description'), 'x');
-    await userEvent.selectOptions(screen.getByLabelText('Category'), 'c1');
-    await userEvent.click(screen.getByRole('button', { name: 'Submit for approval' }));
-    expect((await screen.findAllByText('Category is inactive')).length).toBeGreaterThan(0);
+    await screen.findByRole('dialog', { name: 'Add Transaction' });
+    await userEvent.type(await d().findByLabelText(/Amount/), '10');
+    await userEvent.type(d().getByLabelText('Description'), 'x');
+    await userEvent.selectOptions(d().getByLabelText('Category'), 'c1');
+    await userEvent.click(d().getByRole('button', { name: 'Save Transaction' }));
+    expect((await d().findAllByText('Category is inactive')).length).toBeGreaterThan(0);
   });
 });
 
@@ -320,5 +334,133 @@ describe('settings: categories (admin)', () => {
     await userEvent.type(screen.getByLabelText('Name'), 'Legal');
     await userEvent.click(screen.getByRole('button', { name: /Add/ }));
     await waitFor(() => expect(created).toEqual({ name: 'Legal' }));
+  });
+});
+
+
+describe('add transaction modal', () => {
+  const listBody = { status: 200, body: { items: [tx()], page: 1, pageSize: 25, total: 1 } };
+  const dialog = () => screen.getByRole('dialog', { name: 'Add Transaction' });
+  const fill = async () => {
+    await userEvent.type(await within(dialog()).findByLabelText(/Amount/), '1500');
+    await userEvent.type(within(dialog()).getByLabelText('Description'), 'Hosting');
+    await userEvent.selectOptions(within(dialog()).getByLabelText('Category'), 'c1');
+  };
+
+  it('opens over the visible Transactions list from the Add transaction button, with title, close, Cancel and Save', async () => {
+    mockFetch({ ...me(founderUser), 'GET /transactions': listBody });
+    renderApp('/transactions');
+    await userEvent.click(await screen.findByRole('link', { name: /Add transaction/ }));
+    const dlg = await screen.findByRole('dialog', { name: 'Add Transaction' });
+    expect(dlg).toHaveAttribute('aria-modal', 'true');
+    expect(within(dlg).getByRole('button', { name: 'Close' })).toBeInTheDocument();
+    expect(within(dlg).getByRole('button', { name: 'Cancel' })).toBeInTheDocument();
+    expect(within(dlg).getByRole('button', { name: 'Save Transaction' })).toBeInTheDocument();
+    expect(screen.getByRole('table')).toBeInTheDocument(); // the list stays rendered behind the overlay
+  });
+
+  it('closes with the close button, Cancel and Escape when nothing was entered (no prompt)', async () => {
+    mockFetch({ ...me(founderUser), 'GET /transactions': listBody });
+    renderApp('/transactions/new');
+    await screen.findByRole('dialog', { name: 'Add Transaction' });
+    await userEvent.click(screen.getByRole('button', { name: 'Close' }));
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+    await userEvent.click(await screen.findByRole('link', { name: /Add transaction/ }));
+    await screen.findByRole('dialog', { name: 'Add Transaction' });
+    await userEvent.keyboard('{Escape}');
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+    await userEvent.click(screen.getByRole('link', { name: /Add transaction/ }));
+    await userEvent.click(within(await screen.findByRole('dialog')).getByRole('button', { name: 'Cancel' }));
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+  });
+
+  it('moves focus into the dialog and keeps Tab inside it', async () => {
+    mockFetch({ ...me(founderUser), 'GET /transactions': listBody });
+    renderApp('/transactions/new');
+    const dlg = await screen.findByRole('dialog', { name: 'Add Transaction' });
+    await waitFor(() => expect(dlg.contains(document.activeElement)).toBe(true));
+    for (let i = 0; i < 40; i++) { await userEvent.tab(); expect(dlg.contains(document.activeElement)).toBe(true); }
+  });
+
+  it('warns before discarding entered data; keep editing preserves it, discard leaves without saving', async () => {
+    const calls = mockFetch({ ...me(founderUser), 'GET /transactions': listBody, 'POST /transactions/split-preview': { status: 200, body: { entries: [] } } });
+    renderApp('/transactions/new');
+    await screen.findByRole('dialog', { name: 'Add Transaction' });
+    await fill();
+    await userEvent.keyboard('{Escape}');
+    const confirm = await screen.findByRole('dialog', { name: 'Discard this transaction?' });
+    await userEvent.click(within(confirm).getByRole('button', { name: 'Cancel' }));
+    expect(screen.queryByRole('dialog', { name: 'Discard this transaction?' })).not.toBeInTheDocument();
+    expect(within(dialog()).getByLabelText('Description')).toHaveValue('Hosting');
+    await userEvent.click(within(dialog()).getByRole('button', { name: 'Close' }));
+    await userEvent.click(within(await screen.findByRole('dialog', { name: 'Discard this transaction?' })).getByRole('button', { name: 'Discard' }));
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+    expect(calls.filter((c) => c.startsWith('POST /transactions') && !c.includes('split-preview'))).toEqual([]);
+  });
+
+  it('validates inside the dialog without calling the API and stays open', async () => {
+    const calls = mockFetch({ ...me(founderUser), 'GET /transactions': listBody });
+    renderApp('/transactions/new');
+    await screen.findByRole('dialog', { name: 'Add Transaction' });
+    await userEvent.click(await within(dialog()).findByRole('button', { name: 'Save Transaction' }));
+    expect(await within(dialog()).findByText(/Enter a valid amount greater than 0/)).toBeInTheDocument();
+    expect(within(dialog()).getByText('Add a short description')).toBeInTheDocument();
+    expect(within(dialog()).getByText('Choose a category')).toBeInTheDocument();
+    expect(calls.filter((c) => c === 'POST /transactions')).toEqual([]);
+    expect(dialog()).toBeInTheDocument();
+  });
+
+  it('saves through the API, closes the dialog, shows a confirmation and reloads the list', async () => {
+    let posted: Record<string, unknown> | null = null;
+    const calls = mockFetch({ ...me(founderUser), 'GET /transactions': listBody, 'POST /transactions/split-preview': { status: 200, body: { entries: [] } },
+      'POST /transactions': (_u, init) => { posted = body(init); return { status: 201, body: { transaction: tx() } }; } });
+    renderApp('/transactions/new');
+    await screen.findByRole('dialog', { name: 'Add Transaction' });
+    await fill();
+    const before = calls.filter((c) => c.startsWith('GET /transactions?')).length;
+    await userEvent.click(within(dialog()).getByRole('button', { name: 'Save Transaction' }));
+    expect(await screen.findByText('Transaction submitted for approval.')).toBeInTheDocument();
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(posted).toMatchObject({ type: 'business_expense', amountMinor: 150000, description: 'Hosting', status: 'pending_approval' });
+    await waitFor(() => expect(calls.filter((c) => c.startsWith('GET /transactions?')).length).toBeGreaterThan(before));
+  });
+
+  it('keeps the dialog open with every entered value when the API fails', async () => {
+    mockFetch({ ...me(founderUser), 'GET /transactions': listBody, 'POST /transactions/split-preview': { status: 200, body: { entries: [] } },
+      'POST /transactions': { status: 500, body: { error: { code: 'INTERNAL', message: 'Something went wrong on our side' } } } });
+    renderApp('/transactions/new');
+    await screen.findByRole('dialog', { name: 'Add Transaction' });
+    await fill();
+    await userEvent.click(within(dialog()).getByRole('button', { name: 'Save Transaction' }));
+    expect(await within(dialog()).findByRole('alert')).toHaveTextContent('Something went wrong on our side');
+    expect(within(dialog()).getByLabelText(/Amount/)).toHaveValue('1500');
+    expect(within(dialog()).getByLabelText('Description')).toHaveValue('Hosting');
+    expect(within(dialog()).getByRole('button', { name: 'Save Transaction' })).toBeEnabled(); // can retry
+  });
+
+  it('sends exactly one request when submit fires repeatedly in the same tick, with one idempotency key', async () => {
+    const posts: Array<Record<string, unknown>> = [];
+    mockFetch({ ...me(founderUser), 'GET /transactions': listBody, 'POST /transactions/split-preview': { status: 200, body: { entries: [] } },
+      'POST /transactions': (_u, init) => { posts.push(body(init)); return { status: 201, body: { transaction: tx() } }; } });
+    renderApp('/transactions/new');
+    await screen.findByRole('dialog', { name: 'Add Transaction' });
+    await fill();
+    const form = within(dialog()).getByRole('form', { name: 'Add transaction' });
+    act(() => { fireEvent.submit(form); fireEvent.submit(form); fireEvent.submit(form); });
+    await screen.findByText('Transaction submitted for approval.');
+    expect(posts).toHaveLength(1);
+    expect(typeof posts[0]!['clientRequestId']).toBe('string');
+  });
+
+  it('fits small screens: bottom sheet that never exceeds the viewport, with an internally scrolling body and a pinned footer', async () => {
+    mockFetch({ ...me(founderUser), 'GET /transactions': listBody });
+    renderApp('/transactions/new');
+    const dlg = await screen.findByRole('dialog', { name: 'Add Transaction' });
+    expect(dlg).toHaveClass('max-h-[100dvh]', 'w-full', 'overflow-hidden', 'flex-col');
+    const form = await within(dlg).findByRole('form', { name: 'Add transaction' });
+    expect(form).toHaveClass('min-h-0', 'flex-1');
+    expect(form.firstElementChild).toHaveClass('overflow-y-auto');
+    expect(form.lastElementChild).toContainElement(within(dlg).getByRole('button', { name: 'Save Transaction' }));
+    expect(document.body.style.overflow).toBe('hidden');
   });
 });

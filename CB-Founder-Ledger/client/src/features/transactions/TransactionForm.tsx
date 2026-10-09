@@ -1,6 +1,7 @@
 import { Check, Paperclip, X } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useDirtyGuard } from '../../lib/dirty';
 import { useAuth } from '../../auth/AuthContext';
 import { ErrorBox, FieldError, Label, detailsByPath } from '../../components/ui';
 import { ApiError, api } from '../../lib/api';
@@ -10,6 +11,8 @@ import type { Category, Founder, ReimbursableExpense, Transaction, TransactionTy
 import { useResource } from '../../lib/useResource';
 import { SplitEditor, buildSplitPayload, emptySplit, type PreviewState, type SplitFormState } from './SplitEditor';
 
+// Literal class names so Tailwind's scanner sees them.
+const ORDER_CLASS = ['', 'order-1', 'order-2', 'order-3', 'order-4', 'order-5', 'order-6', 'order-7', 'order-8', 'order-9', 'order-10', 'order-11'];
 const pad = (n: number) => String(n).padStart(2, '0');
 const today = () => { const d = new Date(); return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`; };
 
@@ -62,7 +65,10 @@ function ExpensePicker({ paidBy, selected, onSelect, forReimbursementId, error, 
   );
 }
 
-export function TransactionForm({ existing }: { existing?: Transaction }) {
+/** When `modal` is set the form renders inside the Add Transaction dialog (scrolling body + pinned footer) instead of as a page. */
+export interface ModalHooks { onSaved: (t: Transaction, notice: string) => void; onCancel: () => void; onDirtyChange?: (dirty: boolean) => void }
+
+export function TransactionForm({ existing, modal }: { existing?: Transaction; modal?: ModalHooks }) {
   const cfg = useAppConfig();
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -96,6 +102,7 @@ export function TransactionForm({ existing }: { existing?: Transaction }) {
   // One token per form: a double click or a retried request can never create the same transaction twice (the server de-duplicates by it).
   const requestId = useRef(crypto.randomUUID());
   const initialised = useRef(false);
+  const inflight = useRef(false);
 
   const rules = cfg.transactionTypes.find((t) => t.value === type)!.rules;
   const needsExpense = rules.linkedExpense === 'required' || type === 'reimbursement';
@@ -140,6 +147,11 @@ export function TransactionForm({ existing }: { existing?: Transaction }) {
     return () => { stale = true; clearTimeout(t); };
   }, [previewKey]);
 
+  const dirty = !existing && (!!amount.trim() || !!description.trim() || !!notes.trim() || !!method.trim() || !!categoryId || !!counterparty || !!linkedExpenseId || !!file || useSplit);
+  useDirtyGuard(!!modal && dirty && !busy);
+  const onDirtyChange = modal?.onDirtyChange;
+  useEffect(() => { onDirtyChange?.(dirty); }, [dirty, onDirtyChange]);
+
   const serverErrors = detailsByPath(error);
   const local = {
     amount: amountMinor === null || amountMinor < 1 ? 'Enter a valid amount greater than 0, e.g. 1500 or 1500.50' : undefined,
@@ -158,9 +170,10 @@ export function TransactionForm({ existing }: { existing?: Transaction }) {
     e?.preventDefault();
     setTouched(true);
     setError(null);
-    if (hasLocalError || amountMinor === null || !built && splitVisible) return;
+    if (inflight.current || hasLocalError || amountMinor === null || !built && splitVisible) return;
     const content: Record<string, unknown> = { type, amountMinor, transactionDate: date, description: description.trim() };
     const optional = { notes: notes.trim() || undefined, method: rules.method === 'forbidden' ? undefined : method.trim() || undefined, categoryId: categoryId || undefined, paidByFounderId: paidBy || undefined, counterpartyFounderId: rules.counterparty === 'forbidden' ? undefined : counterparty || undefined, split: splitVisible && built && 'payload' in built ? built.payload : undefined, reimbursesTransactionId: needsExpense ? linkedExpenseId || undefined : undefined };
+    inflight.current = true;
     setBusy(true);
     try {
       let saved: Transaction;
@@ -179,10 +192,11 @@ export function TransactionForm({ existing }: { existing?: Transaction }) {
         const res = await fetch(`/api/transactions/${saved.id}/receipts`, { method: 'POST', body: fd, credentials: 'include' });
         if (!res.ok) notice += ' The receipt could not be uploaded — you can retry from the transaction page.';
       }
-      navigate(`/transactions/${saved.id}`, { state: { notice } });
+      if (modal) modal.onSaved(saved, notice); else navigate(`/transactions/${saved.id}`, { state: { notice } });
     } catch (err) {
       setError(err instanceof ApiError ? err : new ApiError(0, 'NETWORK', 'Could not reach the server'));
     } finally {
+      inflight.current = false;
       setBusy(false);
     }
   }
@@ -202,8 +216,23 @@ export function TransactionForm({ existing }: { existing?: Transaction }) {
   const conflict = error?.code === 'VERSION_CONFLICT';
   const summary = error && !conflict && Array.isArray(error.details) ? [...new Set((error.details as Array<{ message: string }>).map((d) => d.message))] : [];
 
+  const o = (n: number, full = false) => (modal ? `${ORDER_CLASS[n]} ${full ? 'sm:col-span-2' : ''}` : '');
+  const receiptBlock = !existing ? (
+              <div className={o(10)}>
+          <Label htmlFor="receipt" hint="(optional — PDF, JPG or PNG)">Receipt</Label>
+          <input ref={fileInput} id="receipt" type="file" className="sr-only" accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png" onChange={(e) => onFile(e.target.files?.[0])} />
+          {file ? (
+            <div className="flex items-center justify-between gap-3 rounded-xl border border-surface-line bg-surface-alt px-4 py-3 text-sm">
+              <span className="flex min-w-0 items-center gap-2"><Paperclip className="h-4 w-4 shrink-0 text-cb-green-dark" aria-hidden /><span className="truncate font-semibold">{file.name}</span></span>
+              <button type="button" className="btn-ghost !min-h-9 !px-2" aria-label="Remove file" onClick={() => { setFile(null); if (fileInput.current) fileInput.current.value = ''; }}><X className="h-4 w-4" aria-hidden /></button>
+            </div>
+          ) : <button type="button" className="btn-ghost border border-dashed border-surface-line" onClick={() => fileInput.current?.click()}><Paperclip className="h-4 w-4" aria-hidden />Attach a receipt</button>}
+        </div>
+  ) : null;
+
   return (
-    <form onSubmit={(e) => void submit(e, 'pending_approval')} noValidate className="mx-auto max-w-3xl space-y-6" aria-label={existing ? 'Edit transaction' : 'Add transaction'}>
+    <form onSubmit={(e) => void submit(e, 'pending_approval')} noValidate className={modal ? 'flex min-h-0 flex-1 flex-col' : 'mx-auto max-w-3xl space-y-6'} aria-label={existing ? 'Edit transaction' : 'Add transaction'}>
+      <div className={modal ? 'min-h-0 flex-1 space-y-5 overflow-y-auto px-5 py-5 sm:px-6' : 'contents'}>
       {error && (
         <div role="alert" className="rounded-xl bg-danger-soft px-4 py-3 text-sm text-danger">
           <p className="font-semibold">{conflict ? 'This transaction was changed by someone else.' : error.message}</p>
@@ -212,8 +241,8 @@ export function TransactionForm({ existing }: { existing?: Transaction }) {
         </div>
       )}
 
-      <section className="card space-y-5 p-5 sm:p-6">
-        <div>
+      <section className={modal ? 'grid gap-4 sm:grid-cols-2 [&>*]:min-w-0' : 'card space-y-5 p-5 sm:p-6'}>
+        <div className={o(1, true)}>
           <Label htmlFor="type">What kind of transaction is this?</Label>
           <div id="type" role="radiogroup" aria-label="Transaction type" className="grid grid-cols-2 gap-2 sm:grid-cols-4">
             {cfg.transactionTypes.map((t) => (
@@ -223,27 +252,27 @@ export function TransactionForm({ existing }: { existing?: Transaction }) {
           </div>
         </div>
 
-        <div className="grid gap-4 sm:grid-cols-2">
-          <div>
+        <div className={modal ? 'contents' : 'grid gap-4 sm:grid-cols-2'}>
+          <div className={o(5)}>
             <Label htmlFor="amount">Amount ({cfg.currency.code})</Label>
             <input id="amount" inputMode="decimal" autoComplete="off" className="field text-lg font-bold tabular-nums" placeholder="0.00" value={amount} onChange={(e) => setAmount(e.target.value)} aria-invalid={!!show('amount', 'amountMinor')} />
             <FieldError message={show('amount', 'amountMinor')} />
           </div>
-          <div>
+          <div className={o(2)}>
             <Label htmlFor="date">Date</Label>
             <input id="date" type="date" className="field" value={date} onChange={(e) => setDate(e.target.value)} />
             <FieldError message={show('date', 'transactionDate')} />
           </div>
         </div>
 
-        <div>
+        <div className={o(3)}>
           <Label htmlFor="description">Description</Label>
           <input id="description" className="field" maxLength={200} placeholder="e.g. Annual cloud hosting" value={description} onChange={(e) => setDescription(e.target.value)} />
           <FieldError message={show('description', 'description')} />
         </div>
 
-        <div className="grid gap-4 sm:grid-cols-2">
-          <div>
+        <div className={modal ? 'contents' : 'grid gap-4 sm:grid-cols-2'}>
+          <div className={o(4)}>
             <Label htmlFor="category" hint={rules.category === 'required' ? undefined : '(optional)'}>Category</Label>
             <select id="category" className="field" value={categoryId} onChange={(e) => setCategoryId(e.target.value)}>
               <option value="">{categories.length ? 'Select a category' : 'No categories yet'}</option>
@@ -252,7 +281,7 @@ export function TransactionForm({ existing }: { existing?: Transaction }) {
             <FieldError message={show('category', 'categoryId')} />
             {rules.category === 'required' && categories.length === 0 && <p className="mt-1 text-xs text-ink-muted">An admin can add categories in Settings.</p>}
           </div>
-          <div>
+          <div className={o(11, true)}>
             <Label htmlFor="notes" hint={rules.notes === 'required' ? undefined : '(optional)'}>Notes</Label>
             <input id="notes" className="field" maxLength={2000} value={notes} onChange={(e) => setNotes(e.target.value)} />
             <FieldError message={show('notes', 'notes')} />
@@ -260,20 +289,21 @@ export function TransactionForm({ existing }: { existing?: Transaction }) {
         </div>
 
         {rules.method !== 'forbidden' && (
-          <div>
+          <div className={o(9)}>
             <Label htmlFor="method" hint="(optional)">Payment method</Label>
             <input id="method" className="field" maxLength={50} list="method-options" placeholder="e.g. UPI, bank transfer, cash" value={method} onChange={(e) => setMethod(e.target.value)} />
             <datalist id="method-options">{cfg.settings.settlements.paymentMethods.map((x) => <option key={x} value={x} />)}</datalist>
           </div>
         )}
 
-        <FounderPicker id="paidBy" label={type === 'refund' ? 'Which founder received the refund?' : type === 'settlement' ? 'Who paid?' : type === 'reimbursement' ? 'Who is being reimbursed?' : type === 'founder_contribution' || type === 'founder_loan' ? 'Which founder put the money in?' : 'Paid by'} value={paidBy} onChange={(v) => { setPaidBy(v); setLinkedExpenseId(''); }} founders={founders} allowNone={rules.paidBy !== 'required'} error={show('paidBy', 'paidByFounderId')} />
-        {needsExpense && <ExpensePicker paidBy={paidBy} selected={linkedExpenseId} onSelect={setLinkedExpenseId} forReimbursementId={existing?.id} currency={cfg.currency} error={show('expense', 'reimbursesTransactionId')} />}
-        {rules.counterparty !== 'forbidden' && <FounderPicker id="counterparty" label="Who received the money?" value={counterparty} onChange={setCounterparty} founders={founders.filter((f) => f.id !== paidBy)} allowNone={rules.counterparty !== 'required'} error={show('counterparty', 'counterpartyFounderId')} />}
+        <div className={o(6, true)}><FounderPicker id="paidBy" label={type === 'refund' ? 'Which founder received the refund?' : type === 'settlement' ? 'Who paid?' : type === 'reimbursement' ? 'Who is being reimbursed?' : type === 'founder_contribution' || type === 'founder_loan' ? 'Which founder put the money in?' : 'Paid by'} value={paidBy} onChange={(v) => { setPaidBy(v); setLinkedExpenseId(''); }} founders={founders} allowNone={rules.paidBy !== 'required'} error={show('paidBy', 'paidByFounderId')} /></div>
+        {needsExpense && <div className={o(7, true)}><ExpensePicker paidBy={paidBy} selected={linkedExpenseId} onSelect={setLinkedExpenseId} forReimbursementId={existing?.id} currency={cfg.currency} error={show('expense', 'reimbursesTransactionId')} /></div>}
+        {rules.counterparty !== 'forbidden' && <div className={o(8, true)}><FounderPicker id="counterparty" label="Who received the money?" value={counterparty} onChange={setCounterparty} founders={founders.filter((f) => f.id !== paidBy)} allowNone={rules.counterparty !== 'required'} error={show('counterparty', 'counterpartyFounderId')} /></div>}
+        {modal && receiptBlock}
       </section>
 
       {rules.split !== 'forbidden' && (
-        <section className="card space-y-4 p-5 sm:p-6">
+        <section className={modal ? 'space-y-4 rounded-2xl border border-surface-line p-4' : 'card space-y-4 p-5 sm:p-6'}>
           {rules.split === 'optional' && (
             <label className="flex min-h-11 cursor-pointer items-center gap-3 text-sm font-semibold text-cb-navy">
               <input type="checkbox" className="h-5 w-5 accent-cb-blue" checked={useSplit} onChange={(e) => setUseSplit(e.target.checked)} />Split this between founders
@@ -284,23 +314,14 @@ export function TransactionForm({ existing }: { existing?: Transaction }) {
         </section>
       )}
 
-      {!existing && (
-        <section className="card p-5 sm:p-6">
-          <Label htmlFor="receipt" hint="(optional — PDF, JPG or PNG)">Receipt</Label>
-          <input ref={fileInput} id="receipt" type="file" className="sr-only" accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png" onChange={(e) => onFile(e.target.files?.[0])} />
-          {file ? (
-            <div className="flex items-center justify-between gap-3 rounded-xl border border-surface-line bg-surface-alt px-4 py-3 text-sm">
-              <span className="flex min-w-0 items-center gap-2"><Paperclip className="h-4 w-4 shrink-0 text-cb-green-dark" aria-hidden /><span className="truncate font-semibold">{file.name}</span></span>
-              <button type="button" className="btn-ghost !min-h-9 !px-2" aria-label="Remove file" onClick={() => { setFile(null); if (fileInput.current) fileInput.current.value = ''; }}><X className="h-4 w-4" aria-hidden /></button>
-            </div>
-          ) : <button type="button" className="btn-ghost border border-dashed border-surface-line" onClick={() => fileInput.current?.click()}><Paperclip className="h-4 w-4" aria-hidden />Attach a receipt</button>}
-        </section>
-      )}
+      {!modal && receiptBlock}
 
-      <div className="sticky bottom-0 -mx-4 flex flex-col-reverse gap-2 border-t border-surface-line bg-white/95 p-4 backdrop-blur sm:static sm:mx-0 sm:flex-row sm:justify-end sm:border-0 sm:bg-transparent sm:p-0">
-        <button type="button" className="btn-ghost" onClick={() => navigate(existing ? `/transactions/${existing.id}` : '/transactions')} disabled={busy}>Cancel</button>
+      </div>
+
+      <div className={modal ? 'grid grid-cols-2 gap-2 border-t border-surface-line bg-white px-5 py-3 sm:flex sm:justify-end sm:px-6 sm:py-4' : 'sticky bottom-0 -mx-4 flex flex-col-reverse gap-2 border-t border-surface-line bg-white/95 p-4 backdrop-blur sm:static sm:mx-0 sm:flex-row sm:justify-end sm:border-0 sm:bg-transparent sm:p-0'}>
+        <button type="button" className="btn-ghost" onClick={() => (modal ? modal.onCancel() : navigate(existing ? `/transactions/${existing.id}` : '/transactions'))} disabled={busy}>Cancel</button>
         {!existing && <button type="button" className="btn border border-cb-blue text-cb-blue hover:bg-cb-blue/5" disabled={busy} onClick={() => void submit(null, 'draft')}>Save as draft</button>}
-        <button type="submit" className="btn-primary" disabled={busy || conflict}>{busy ? 'Saving…' : existing ? 'Save changes' : 'Submit for approval'}</button>
+        <button type="submit" className={`btn-primary ${modal ? 'order-first col-span-2 sm:order-none sm:col-span-1' : ''}`} disabled={busy || conflict}>{busy ? 'Saving…' : existing ? 'Save changes' : modal ? 'Save Transaction' : 'Submit for approval'}</button>
       </div>
     </form>
   );

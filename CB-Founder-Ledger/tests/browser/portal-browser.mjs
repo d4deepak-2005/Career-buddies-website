@@ -153,14 +153,30 @@ ok('categories: form lists both in the configured order', JSON.stringify(await p
 
 // ═══════════════ 6. Transactions: validation, duplicate-submit protection, create, approve ═══════════════
 await go(page, '/transactions/new', '#amount');
-await page.click('button:has-text("Submit for approval")');
+await page.click('[role=dialog] button:has-text("Save Transaction")');
 ok('transaction form: client validation messages', (await text(page)).includes('Enter a valid amount greater than 0') && (await text(page)).includes('Add a short description') && (await text(page)).includes('Choose a category'));
+
+// ── Add Transaction modal behaviour ──
+ok('modal: opens as a dialog over the visible Transactions list', (await page.locator('[role=dialog][aria-label="Add Transaction"], [role=dialog]:has(#modal-title)').count()) === 1 && (await page.locator('[role=tablist][aria-label="Status quick filter"]').isVisible()));
+ok('modal: focus starts inside the dialog', await page.evaluate(() => !!document.activeElement?.closest('[role=dialog]')));
+await page.fill('#description', 'Unsaved draft text'); await page.keyboard.press('Escape');
+ok('modal: Escape with entered data asks before discarding', (await page.locator('text=Discard this transaction?').count()) === 1);
+await page.click('[role=dialog] button:has-text("Cancel") >> nth=-1'); await page.waitForTimeout(200);
+ok('modal: choosing Cancel in the prompt keeps the entered text', (await page.inputValue('#description')) === 'Unsaved draft text');
+await page.click('button[aria-label="Close"]'); await page.click('button:has-text("Discard")'); await page.waitForURL(/\/transactions$/);
+ok('modal: Discard closes it and returns to the list without creating anything', (await page.locator('[role=dialog]').count()) === 0 && (await api('/transactions?search=Unsaved')).body.total === 0);
+await page.click('a:has-text("Add transaction")'); await page.waitForSelector('#amount');
+ok('modal: the Add transaction button reopens it', (await page.locator('[role=dialog]').count()) === 1);
+await page.setViewportSize({ width: 390, height: 700 });
+const box = await page.locator('[role=dialog]').boundingBox();
+ok('modal: fits a 390×700 phone (no overflow, footer button reachable)', box.height <= 700 && box.width <= 390 && await page.locator('[role=dialog] button:has-text("Save Transaction")').isVisible());
+await page.setViewportSize({ width: 1366, height: 850 });
 await page.fill('#amount', '3000'); await page.fill('#description', 'Annual hosting'); await page.selectOption('#category', cat['Cloud hosting']);
 await page.click(`[role=radiogroup][aria-label="Paid by"] >> text=Nishant Sharma`);
-const submit = page.locator('button:has-text("Submit for approval")');
+const submit = page.locator('[role=dialog] button:has-text("Save Transaction")');
 await Promise.allSettled([submit.click({ timeout: 8000 }), submit.click({ force: true, timeout: 3000 }), submit.click({ force: true, timeout: 3000 })]);
-await page.waitForURL(/\/transactions\/[a-f0-9]{24}$/);
-const e1 = page.url().split('/').pop();
+await page.waitForSelector('text=Transaction submitted for approval.');
+const e1 = (await api('/transactions?search=Annual%20hosting')).body.items[0].id;
 const list1 = (await api('/transactions?search=Annual%20hosting')).body;
 ok('double/triple click creates exactly ONE transaction', list1.total === 1, `${list1.total}`);
 ok('new transaction is Pending approval and NOT counted', list1.items[0].status === 'pending_approval' && (await api('/dashboard')).body.kpis.totalBusinessExpensesMinor === 0);
@@ -191,9 +207,9 @@ await page.click('[role=radio]:has-text("Reimbursement")');
 await page.click('[role=radiogroup][aria-label="Who is being reimbursed?"] >> text=Nishant Sharma');
 await page.waitForSelector('[aria-label="Expense being reimbursed"] [role=radio]');
 await page.fill('#amount', '1000'); await page.fill('#description', 'Reimbursed hosting');
-await page.click('[aria-label="Expense being reimbursed"] [role=radio]'); await page.click('button:has-text("Submit for approval")'); await page.waitForURL(/\/transactions\/[a-f0-9]{24}$/);
-const r1 = page.url().split('/').pop();
-await page.waitForSelector('button[aria-label^="Approve"]'); await page.click('button[aria-label^="Approve"]'); await page.click('[role=dialog] button:has-text("Approve")');
+await page.click('[aria-label="Expense being reimbursed"] [role=radio]'); await page.click('[role=dialog] button:has-text("Save Transaction")'); await page.waitForSelector('text=Transaction submitted for approval.');
+const r1 = (await api('/transactions?search=Reimbursed%20hosting')).body.items[0].id;
+await go(page, `/transactions/${r1}`, 'button[aria-label^="Approve"]'); await page.click('button[aria-label^="Approve"]'); await page.click('[role=dialog] button:has-text("Approve")');
 await page.waitForSelector('text=Approved'); 
 const d2 = (await api('/dashboard')).body;
 ok('reimbursement approved: business-borne ₹1,000; founders share ₹2,000 (A +1,333.33, B −666.67, C −666.66)', d2.kpis.reimbursedByBusinessMinor === 100_000 && [d2.founders[0].netPositionMinor, d2.founders[1].netPositionMinor, d2.founders[2].netPositionMinor].join() === '133333,-66667,-66666', JSON.stringify(d2.founders.map((f) => f.netPositionMinor)));
@@ -204,7 +220,7 @@ ok('Founders page shows founder-funded expenses ₹2,000 and reimbursed ₹1,000
 await go(page, '/transactions/new', '#amount');
 await page.click('[role=radio]:has-text("Reimbursement")'); await page.click('[role=radiogroup][aria-label="Who is being reimbursed?"] >> text=Nishant Sharma');
 await page.waitForSelector('[aria-label="Expense being reimbursed"] [role=radio]'); await page.click('[aria-label="Expense being reimbursed"] [role=radio]');
-await page.fill('#amount', '2500'); await page.fill('#description', 'Too much'); await page.click('button:has-text("Submit for approval")');
+await page.fill('#amount', '2500'); await page.fill('#description', 'Too much'); await page.click('[role=dialog] button:has-text("Save Transaction")');
 await page.waitForSelector('[role=alert]');
 ok('over-reimbursement (₹2,500 > ₹2,000 left) is rejected with a clear message', /above the expense amount/.test(await text(page, 'main')));
 // expense void guard, then reimbursement void restores

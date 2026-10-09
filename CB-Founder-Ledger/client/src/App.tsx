@@ -11,7 +11,7 @@ import { SettlementsPage } from './features/financials/SettlementsPage';
 import { RecurringPage } from './features/recurring/RecurringPage';
 import { ReportsPage } from './features/reports/ReportsPage';
 import { SettingsPage } from './features/settings/SettingsPage';
-import { AddTransactionPage, EditTransactionPage } from './features/transactions/TransactionFormPages';
+import { EditTransactionPage } from './features/transactions/TransactionFormPages';
 import { TransactionDetailPage } from './features/transactions/TransactionDetailPage';
 import { TransactionsPage } from './features/transactions/TransactionsPage';
 import { AppConfigProvider } from './lib/AppConfigContext';
@@ -21,7 +21,7 @@ import { LoginPage } from './pages/LoginPage';
 const PAGES: Record<string, ReactElement> = {
   '/dashboard': <DashboardPage />,
   '/transactions': <TransactionsPage />,
-  '/transactions/new': <AddTransactionPage />,
+  '/transactions/new': <TransactionsPage addOpen />,
   '/founders': <FoundersPage />,
   '/settlements': <SettlementsPage />,
   '/approvals': <ApprovalsPage />,
