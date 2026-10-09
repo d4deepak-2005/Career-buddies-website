@@ -28,8 +28,8 @@ export function SettingsPage() {
   const confirmLeave = useConfirmLeave();
   const current = SECTIONS.find((s) => s.id === params.get('section')) ?? SECTIONS[0]!;
   return (
-    <div className="mx-auto grid max-w-6xl gap-5 lg:grid-cols-[15rem_1fr]">
-      <nav aria-label="Settings sections" className="card h-fit p-2 lg:sticky lg:top-24">
+    <div className="mx-auto grid max-w-6xl gap-5 grid-cols-[minmax(0,1fr)] lg:grid-cols-[15rem_minmax(0,1fr)]">
+      <nav aria-label="Settings sections" className="card h-fit min-w-0 p-2 lg:sticky lg:top-24">
         <ul className="flex gap-1 overflow-x-auto lg:flex-col lg:overflow-visible">
           {SECTIONS.map(({ id, label, icon: Icon }) => (
             <li key={id} className="shrink-0 lg:shrink">
