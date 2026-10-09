@@ -395,7 +395,7 @@ describe('access control, list, detail', () => {
 
   it('config endpoint exposes currency and type rules to the client (nothing hard-coded there)', async () => {
     const c = await w.a.get('/api/config');
-    expect(c.body.currency).toEqual({ code: 'INR', minorUnits: 2 });
+    expect(c.body.currency).toEqual({ code: 'INR', minorUnits: 2, locale: 'en-IN' });
     expect(c.body.transactionTypes).toHaveLength(7);
     expect(c.body.transactionTypes.find((x: { value: string }) => x.value === 'settlement').rules.counterparty).toBe('required');
     expect(c.body.receipts.allowedExtensions).toEqual(['pdf', 'jpg', 'jpeg', 'png']);

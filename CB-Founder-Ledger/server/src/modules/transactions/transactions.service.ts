@@ -9,6 +9,8 @@ import { Receipt } from '../../models/Receipt';
 import { Transaction, type TransactionDoc } from '../../models/Transaction';
 import { REVISION_ACTIONS, TransactionRevision } from '../../models/TransactionRevision';
 import { User } from '../../models/User';
+import { audit } from '../../lib/audit';
+import { loadSettings } from '../settings/settings.service';
 import type { AuthUser } from '../../middleware/auth';
 import { activeLinkedReimbursements, capacityError, checkReimbursementTarget, hasLinkedError, heldBy, releaseCapacity, reserveCapacity } from './reimbursements';
 import type { ListQuery, TransactionContent } from './transactions.schemas';
@@ -157,6 +159,7 @@ export async function hydrate(txs: StoredTx[]) {
   for (const t of txs) {
     userIds.add(String(t.createdBy)); userIds.add(String(t.updatedBy));
     if (t.void?.voidedBy) userIds.add(String(t.void.voidedBy));
+    if (t.decision?.by) userIds.add(String(t.decision.by));
     for (const f of referencedFounderIds(t)) founderIds.add(f);
     if (t.categoryId) categoryIds.add(String(t.categoryId));
   }
@@ -181,6 +184,9 @@ export async function hydrate(txs: StoredTx[]) {
     description: t.description,
     notes: t.notes ?? null,
     method: t.method ?? null,
+    recurringId: idStr(t.recurringId) ?? null,
+    recurringDueDate: t.recurringDueDate ?? null,
+    decision: t.decision ? { outcome: t.decision.outcome, at: t.decision.at, comment: t.decision.comment ?? null, by: named(u, t.decision.by) } : null,
     // Option C. Reimbursement: the expense it reimburses. Expense: how much is already reserved by active reimbursements (display only).
     reimbursesTransactionId: idStr(t.reimbursesTransactionId) ?? null,
     reimbursesTransaction: t.reimbursesTransactionId ? (targetById.get(String(t.reimbursesTransactionId)) ?? null) : null,
@@ -231,7 +237,14 @@ function assertOwnerOrAdmin(tx: StoredTx, actor: AuthUser) {
 
 const conflict = (current: number) => new AppError(409, 'VERSION_CONFLICT', 'This transaction was changed by someone else. Reload to see the latest version.', { currentVersion: current });
 
-export async function createTransaction(content: TransactionContent, status: 'draft' | 'pending_approval', actor: AuthUser) {
+const auditView = (tx: StoredTx) => ({ txnNumber: tx.txnNumber, type: tx.type, status: tx.status, amountMinor: tx.amountMinor, transactionDate: tx.transactionDate.toISOString().slice(0, 10), description: tx.description, categoryId: idStr(tx.categoryId), paidByFounderId: idStr(tx.paidByFounderId), counterpartyFounderId: idStr(tx.counterpartyFounderId), reimbursesTransactionId: idStr(tx.reimbursesTransactionId) });
+
+/** Result of a create; `replayed` means the same clientRequestId had already created this record (double submit). */
+export async function createTransaction(content: TransactionContent, status: 'draft' | 'pending_approval', actor: AuthUser, opts: { clientRequestId?: string | undefined; recurring?: { id: string; dueDate: string } } = {}) {
+  if (opts.clientRequestId) {
+    const prior = await Transaction.findOne({ createdBy: actor.id, clientRequestId: opts.clientRequestId }).lean<StoredTx>();
+    if (prior) return Object.assign(prior, { replayed: true });
+  }
   const resolved = await validateContent(content);
   // Option C: reserve the expense's capacity atomically BEFORE writing, so concurrent reimbursements cannot exceed it.
   const reserved = content.type === 'reimbursement' && content.reimbursesTransactionId ? { expenseId: content.reimbursesTransactionId, amount: content.amountMinor } : null;
@@ -245,14 +258,22 @@ export async function createTransaction(content: TransactionContent, status: 'dr
       status,
       createdBy: actor.id,
       updatedBy: actor.id,
+      ...(opts.clientRequestId ? { clientRequestId: opts.clientRequestId } : {}),
+      ...(opts.recurring ? { recurringId: opts.recurring.id, recurringDueDate: opts.recurring.dueDate, recurringKey: `${opts.recurring.id}:${opts.recurring.dueDate}` } : {}),
     });
   } catch (err) {
     if (reserved) await releaseCapacity(reserved.expenseId, reserved.amount); // roll back the reservation
+    // Two identical submits racing: the unique (creator, clientRequestId) index lets exactly one win; return the winner.
+    if (opts.clientRequestId && (err as { code?: number }).code === 11000) {
+      const prior = await Transaction.findOne({ createdBy: actor.id, clientRequestId: opts.clientRequestId }).lean<StoredTx>();
+      if (prior) return Object.assign(prior, { replayed: true });
+    }
     throw err;
   }
   const tx = created.toObject() as unknown as StoredTx;
   await recordRevision(tx, 'created', actor.id);
-  return tx;
+  await audit(actor, { action: tx.type === 'settlement' ? 'SETTLEMENT_CREATED' : 'TRANSACTION_CREATED', entityType: 'transaction', entityId: String(tx._id), summary: `${tx.txnNumber} created (${tx.type.replace('_', ' ')}, ${status.replace('_', ' ')})`, after: auditView(tx) });
+  return Object.assign(tx, { replayed: false });
 }
 
 type Patch = Partial<{ [K in keyof TransactionContent]: TransactionContent[K] | null }> & { expectedVersion: number };
@@ -310,6 +331,7 @@ export async function updateTransaction(id: string, patch: Patch, actor: AuthUse
     await releaseCapacity(oldHeld.expenseId, oldHeld.amount - keep);
   }
   await recordRevision(updated, 'edited', actor.id);
+  await audit(actor, { action: 'TRANSACTION_EDITED', entityType: 'transaction', entityId: id, summary: `${updated.txnNumber} edited`, before: auditView(existing), after: auditView(updated) });
   return updated;
 }
 
@@ -325,6 +347,7 @@ export async function submitTransaction(id: string, expectedVersion: number, act
   ).lean<StoredTx>();
   if (!updated) throw conflict((await loadOr404(id)).version);
   await recordRevision(updated, 'submitted', actor.id);
+  await audit(actor, { action: 'TRANSACTION_SUBMITTED', entityType: 'transaction', entityId: id, summary: `${updated.txnNumber} submitted for approval`, before: { status: existing.status }, after: { status: updated.status } });
   return updated;
 }
 
@@ -341,7 +364,7 @@ export async function voidTransaction(id: string, expectedVersion: number, reaso
   const updated = await Transaction.findOneAndUpdate(
     // For an expense the write is also conditional on "nothing reserved", closing the race with a reimbursement being created right now.
     { _id: id, version: expectedVersion, status: trusted({ $ne: 'voided' as TransactionStatus }), ...(isExpense ? { reimbursedMinor: trusted({ $in: [0, null] }) } : {}) },
-    { $set: { status: 'voided', updatedBy: actor.id, void: { reason, voidedBy: actor.id, voidedAt: new Date() } }, $inc: { version: 1 } },
+    { $set: { status: 'voided', updatedBy: actor.id, void: { reason, voidedBy: actor.id, voidedAt: new Date() } }, $unset: { recurringKey: 1 }, $inc: { version: 1 } },
     { new: true },
   ).lean<StoredTx>();
   if (!updated) {
@@ -353,6 +376,57 @@ export async function voidTransaction(id: string, expectedVersion: number, reaso
   const held = heldBy(existing);
   if (held) await releaseCapacity(held.expenseId, held.amount);
   await recordRevision(updated, 'voided', actor.id, { reason });
+  await audit(actor, { action: 'TRANSACTION_VOIDED', entityType: 'transaction', entityId: id, summary: `${updated.txnNumber} voided`, before: { status: existing.status, amountMinor: existing.amountMinor }, after: { status: 'voided' }, reason });
+  return updated;
+}
+
+/**
+ * Approval workflow (Product Plan §11). Only pending transactions can be decided. The decision stores who, when and an
+ * optional comment. Concurrency: the write is conditional on the version the decider saw.
+ */
+export async function decideTransaction(id: string, expectedVersion: number, outcome: 'approved' | 'rejected', comment: string | undefined, actor: AuthUser) {
+  const existing = await loadOr404(id);
+  if (!canTransition(existing.status, outcome) || existing.status !== 'pending_approval') {
+    throw new AppError(409, 'INVALID_TRANSITION', `Only a pending transaction can be ${outcome}. This one is ${existing.status.replace('_', ' ')}.`);
+  }
+  if (existing.version !== expectedVersion) throw conflict(existing.version);
+  const settings = (await loadSettings()).values.approvals;
+  if (!settings.allowSelfApproval && String(existing.createdBy) === actor.id) {
+    throw new AppError(403, 'SELF_APPROVAL_NOT_ALLOWED', 'You created this transaction. Approval rules require someone else to decide it (Settings → Approval rules).');
+  }
+  const trimmed = comment?.trim() || undefined;
+  if (outcome === 'rejected' && settings.requireRejectionReason && (!trimmed || trimmed.length < 3)) {
+    throw new AppError(400, 'REASON_REQUIRED', 'A reason is required to reject a transaction', [{ path: 'comment', message: 'Please give a reason (at least 3 characters)' }]);
+  }
+  if (outcome === 'approved' && existing.type === 'reimbursement') {
+    // The linked expense must still be an approved expense (it cannot be voided while this reimbursement is active, but check anyway).
+    const issues = await checkReimbursementTarget({ reimbursesTransactionId: idStr(existing.reimbursesTransactionId), paidByFounderId: idStr(existing.paidByFounderId) });
+    if (issues.length > 0) throw validationError(issues);
+  }
+  const now = new Date();
+  const updated = await Transaction.findOneAndUpdate(
+    { _id: id, version: expectedVersion, status: 'pending_approval' },
+    {
+      $set: { status: outcome, updatedBy: actor.id, decision: { outcome, by: actor.id, at: now, ...(trimmed ? { comment: trimmed } : {}) } },
+      ...(outcome === 'rejected' ? { $unset: { recurringKey: 1 } } : {}),
+      $inc: { version: 1 },
+    },
+    { new: true },
+  ).lean<StoredTx>();
+  if (!updated) throw conflict((await loadOr404(id)).version);
+  // A rejected reimbursement no longer counts: give its reserved capacity back so the expense is fully reimbursable again.
+  if (outcome === 'rejected') {
+    const held = heldBy(existing);
+    if (held) await releaseCapacity(held.expenseId, held.amount);
+  }
+  await recordRevision(updated, outcome, actor.id, trimmed ? { reason: trimmed } : {});
+  await audit(actor, {
+    action: outcome === 'approved' ? 'TRANSACTION_APPROVED' : 'TRANSACTION_REJECTED', entityType: 'transaction', entityId: id,
+    summary: `${updated.txnNumber} ${outcome}`, before: { status: 'pending_approval' }, after: { status: outcome }, reason: trimmed,
+  });
+  if (outcome === 'approved' && updated.type === 'settlement') {
+    await audit(actor, { action: 'SETTLEMENT_COMPLETED', entityType: 'transaction', entityId: id, summary: `${updated.txnNumber} settlement confirmed (${updated.amountMinor} minor units)`, after: auditView(updated) });
+  }
   return updated;
 }
 

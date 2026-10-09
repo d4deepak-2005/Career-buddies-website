@@ -1,6 +1,6 @@
 import { calculate, type CalcTransaction, type CalculationResult, type FounderFinancialPosition, type LedgerEffect } from '../../domain/calculationEngine';
 import type { TransactionStatus, TransactionType } from '../../domain/transactionRules';
-import { Founder } from '../../models/Founder';
+import { FOUNDER_ORDER, Founder } from '../../models/Founder';
 import { Transaction } from '../../models/Transaction';
 
 interface StoredTx {
@@ -9,8 +9,11 @@ interface StoredTx {
   split?: { entries: Array<{ founderId: unknown; allocatedMinor: number }> } | null;
 }
 
+export interface FounderMeta { role: string | null; photoUrl: string | null; displayOrder: number; active: boolean }
+
 export interface Loaded {
   calculatedAt: string;
+  founderMeta: Map<string, FounderMeta>;
   result: CalculationResult;
   names: Map<string, string>;
   stored: StoredTx[];
@@ -25,7 +28,7 @@ const idOrNull = (v: unknown) => (v ? String(v) : null);
  */
 export async function loadCalculation(opts: { asOf?: string } = {}): Promise<Loaded> {
   const [founders, stored] = await Promise.all([
-    Founder.find().sort({ createdAt: 1, _id: 1 }).select('name active').lean(),
+    Founder.find().sort(FOUNDER_ORDER).select('name active role displayOrder photo').lean(),
     Transaction.find()
       .select('txnNumber type status amountMinor description transactionDate method paidByFounderId counterpartyFounderId categoryId reimbursesTransactionId split.entries.founderId split.entries.allocatedMinor')
       .sort({ transactionDate: 1, _id: 1 })
@@ -46,7 +49,8 @@ export async function loadCalculation(opts: { asOf?: string } = {}): Promise<Loa
   }));
 
   const result = calculate({ founders: founders.map((f) => ({ id: String(f._id), name: f.name, active: f.active })), transactions: calcTxs });
-  return { calculatedAt: new Date().toISOString(), result, names: new Map(founders.map((f) => [String(f._id), f.name])), stored };
+  const founderMeta = new Map(founders.map((f) => [String(f._id), { role: f.role ?? null, displayOrder: f.displayOrder ?? 1000, active: f.active, photoUrl: f.photo ? `/api/founders/${String(f._id)}/photo?v=${f.photo.updatedAt.getTime()}` : null }]));
+  return { calculatedAt: new Date().toISOString(), founderMeta, result, names: new Map(founders.map((f) => [String(f._id), f.name])), stored };
 }
 
 const named = (names: Map<string, string>, id: string | null) => (id ? { id, name: names.get(id) ?? 'Unknown' } : null);

@@ -1,6 +1,6 @@
 import { Schema, model } from 'mongoose';
 
-export const REVISION_ACTIONS = ['created', 'edited', 'submitted', 'voided', 'receipt_added'] as const;
+export const REVISION_ACTIONS = ['created', 'edited', 'submitted', 'approved', 'rejected', 'voided', 'receipt_added'] as const;
 
 /** Append-only history: one row per change, holding the state AFTER the change. */
 const revisionSchema = new Schema(

@@ -2,6 +2,7 @@ import { Router, type Response } from 'express';
 import { z } from 'zod';
 import { getEnv } from '../../config/env';
 import { asyncHandler } from '../../lib/asyncHandler';
+import { audit, auditAnonymous } from '../../lib/audit';
 import { AppError } from '../../lib/errors';
 import { verifyPassword } from '../../lib/password';
 import { randomUUID } from 'node:crypto';
@@ -75,7 +76,10 @@ authRouter.post(
     const { email, password } = req.body as z.infer<typeof loginSchema>;
     const user = await User.findOne({ email }).select('+passwordHash');
     const ok = await verifyPassword(password, user?.passwordHash ?? DUMMY_HASH);
-    if (!user || !ok || user.status !== 'active') throw AppError.unauthorized('Invalid email or password');
+    if (!user || !ok || user.status !== 'active') {
+      await auditAnonymous({ action: 'LOGIN_FAILED', entityType: 'auth', actorLabel: email, summary: 'Failed sign-in attempt' });
+      throw AppError.unauthorized('Invalid email or password');
+    }
 
     const refresh = newRefreshToken();
     await user.updateOne({ $set: { lastLoginAt: new Date() } });
@@ -83,6 +87,7 @@ authRouter.post(
     await addSession(String(user._id), sid, refresh.hash, req.get('user-agent'));
 
     setAuthCookies(res, String(user._id), user.role, sid, refresh.token);
+    await audit({ id: String(user._id), name: user.name, email: user.email }, { action: 'LOGIN', entityType: 'auth', entityId: String(user._id), summary: 'Signed in' });
     res.json({ user: { id: String(user._id), email: user.email, name: user.name, role: user.role } });
   }),
 );
@@ -121,6 +126,8 @@ authRouter.post(
   asyncHandler(async (req, res) => {
     const token: unknown = req.cookies?.[REFRESH_COOKIE];
     if (typeof token === 'string') {
+      const who = await User.findOne({ 'sessions.tokenHash': hashRefreshToken(token) }).select('name email').lean();
+      if (who) await audit({ id: String(who._id), name: who.name, email: who.email }, { action: 'LOGOUT', entityType: 'auth', entityId: String(who._id), summary: 'Signed out' });
       await User.updateOne({ 'sessions.tokenHash': hashRefreshToken(token) }, { $pull: { sessions: { tokenHash: hashRefreshToken(token) } } });
     }
     clearAuthCookies(res);

@@ -46,7 +46,7 @@ const contentShape = {
 export const contentSchema = z.object(contentShape).strict();
 export type TransactionContent = z.infer<typeof contentSchema>;
 
-export const createSchema = z.object({ ...contentShape, status: z.enum(CREATABLE_STATUSES).default('pending_approval') }).strict();
+export const createSchema = z.object({ ...contentShape, status: z.enum(CREATABLE_STATUSES).default('pending_approval'), clientRequestId: z.string().regex(/^[A-Za-z0-9_-]{8,64}$/, 'Invalid request id').optional() }).strict();
 
 const nullable = { notes: contentShape.notes.nullable(), method: contentShape.method.nullable(), reimbursesTransactionId: contentShape.reimbursesTransactionId.nullable(), categoryId: contentShape.categoryId.nullable(), paidByFounderId: contentShape.paidByFounderId.nullable(), counterpartyFounderId: contentShape.counterpartyFounderId.nullable(), split: splitSchema.nullable() };
 
@@ -66,6 +66,7 @@ export const patchSchema = z
   .refine((v) => Object.keys(v).length > 1, 'Provide at least one field to change');
 
 export const versionOnlySchema = z.object({ expectedVersion: z.number().int().min(1) }).strict();
+export const decisionBodySchema = z.object({ expectedVersion: z.number().int().min(1), comment: z.string().trim().max(500).optional() }).strict();
 export const voidBodySchema = z.object({ expectedVersion: z.number().int().min(1), reason: z.string().trim().min(5, 'Please give a reason (at least 5 characters)').max(500) }).strict();
 export const previewSchema = z.object({ amountMinor, split: splitSchema }).strict();
 

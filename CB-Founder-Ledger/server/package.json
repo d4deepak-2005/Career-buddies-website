@@ -18,7 +18,11 @@
     "seed:dev-categories": "tsx src/scripts/seedDevCategories.ts",
     "seed:dev-categories:prod": "node dist/scripts/seedDevCategories.js",
     "reconcile:reimbursements": "tsx src/scripts/reconcileReimbursements.ts",
-    "reconcile:reimbursements:prod": "node dist/scripts/reconcileReimbursements.js"
+    "reconcile:reimbursements:prod": "node dist/scripts/reconcileReimbursements.js",
+    "seed:founders": "tsx src/scripts/seedFounders.ts",
+    "seed:founders:prod": "node dist/scripts/seedFounders.js",
+    "import:assets": "tsx src/scripts/importBrandAssets.ts",
+    "import:assets:prod": "node dist/scripts/importBrandAssets.js"
   },
   "dependencies": {
     "bcryptjs": "^3.0.3",

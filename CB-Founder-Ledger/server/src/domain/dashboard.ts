@@ -18,7 +18,7 @@ export interface DashTx {
   date: string; // YYYY-MM-DD
   paidByFounderId: string | null; counterpartyFounderId: string | null; categoryId: string | null;
 }
-export interface DashFilters { from?: string | undefined; to?: string | undefined; founderId?: string | undefined; categoryId?: string | undefined }
+export interface DashFilters { from?: string | undefined; to?: string | undefined; founderId?: string | undefined; categoryId?: string | undefined; type?: TransactionType | undefined }
 export interface DashInput {
   result: CalculationResult;
   txs: DashTx[];
@@ -26,9 +26,11 @@ export interface DashInput {
   categoryNames: Map<string, string>;
   filters: DashFilters;
   recentLimit?: number;
+  founderMeta?: Map<string, { role: string | null; photoUrl: string | null }>;
 }
 
 const MAX_MONTHS = 60;
+const countBy = (rows: DashTx[], key: (t: DashTx) => string) => rows.reduce<Record<string, number>>((m, t) => { m[key(t)] = (m[key(t)] ?? 0) + 1; return m; }, {});
 const MAX_SLICES = 7;
 
 function monthsBetween(first: string, last: string): string[] {
@@ -42,13 +44,14 @@ function monthsBetween(first: string, last: string): string[] {
   return out;
 }
 
-export function buildDashboard({ result, txs, founderNames, categoryNames, filters, recentLimit = 10 }: DashInput) {
+export function buildDashboard({ result, txs, founderNames, categoryNames, filters, recentLimit = 10, founderMeta }: DashInput) {
   const { from, to, founderId, categoryId } = filters;
   const inPeriod = (t: DashTx) => (!from || t.date >= from) && (!to || t.date <= to);
   const matches = (t: DashTx) =>
     inPeriod(t) &&
     (!founderId || t.paidByFounderId === founderId || t.counterpartyFounderId === founderId) &&
-    (!categoryId || t.categoryId === categoryId);
+    (!categoryId || t.categoryId === categoryId) &&
+    (!filters.type || t.type === filters.type);
   const byId = new Map(txs.map((t) => [t.id, t]));
 
   // ---- period flows from the engine's official results
@@ -57,6 +60,9 @@ export function buildDashboard({ result, txs, founderNames, categoryNames, filte
   const touch = (date: string) => { const k = date.slice(0, 7); const v = monthly.get(k) ?? { expensesMinor: 0, investmentMinor: 0 }; monthly.set(k, v); return v; };
   const catTotals = new Map<string, number>();
   const contribByFounder = new Map<string, { contributionMinor: number; loanMinor: number }>();
+  // Per-founder period flows straight from the engine's effects (expense shares, amounts paid, reimbursements received).
+  const periodByFounder = new Map<string, { expenseShareMinor: number; refundShareMinor: number; expensePaidMinor: number; reimbursementReceivedMinor: number }>();
+  const pf = (id: string) => { const v = periodByFounder.get(id) ?? { expenseShareMinor: 0, refundShareMinor: 0, expensePaidMinor: 0, reimbursementReceivedMinor: 0 }; periodByFounder.set(id, v); return v; };
 
   for (const e of result.expenses) {
     const t = byId.get(e.expenseId);
@@ -70,6 +76,10 @@ export function buildDashboard({ result, txs, founderNames, categoryNames, filte
   const eff = (fx: LedgerEffect) => {
     const t = byId.get(fx.transactionId);
     if (!t || !matches(t)) return;
+    if (fx.kind === 'expense_share') pf(fx.founderId).expenseShareMinor += fx.amountMinor;
+    else if (fx.kind === 'refund_share') pf(fx.founderId).refundShareMinor += fx.amountMinor;
+    else if (fx.kind === 'expense_paid') pf(fx.founderId).expensePaidMinor += fx.amountMinor;
+    else if (fx.kind === 'reimbursement_received') pf(fx.founderId).reimbursementReceivedMinor += fx.amountMinor;
     if (fx.kind === 'refund_received') refundsMinor += fx.amountMinor;
     else if (fx.kind === 'settlement_paid') settledMinor += fx.amountMinor;
     else if (fx.kind === 'contribution' || fx.kind === 'loan') {
@@ -105,7 +115,7 @@ export function buildDashboard({ result, txs, founderNames, categoryNames, filte
   const founders = result.founders
     .filter((f) => !founderId || f.founderId === founderId)
     .map((f) => ({
-      founderId: f.founderId, name: f.founderName, active: f.active,
+      founderId: f.founderId, name: f.founderName, active: f.active, role: founderMeta?.get(f.founderId)?.role ?? null, photoUrl: founderMeta?.get(f.founderId)?.photoUrl ?? null,
       contributionMinor: f.contributionMinor, loanOutstandingMinor: f.loanOutstandingMinor,
       investedMinor: f.contributionMinor + f.loanOutstandingMinor, // presentation of two engine fields (Product Plan "Invested")
       paidMinor: f.paidMinor, fairShareMinor: f.fairShareMinor, netPositionMinor: f.grossNetPositionMinor,
@@ -140,16 +150,33 @@ export function buildDashboard({ result, txs, founderNames, categoryNames, filte
       settledMinor,
       /** Cumulative to `to`; all founders; not narrowed by founder/category filters. */
       outstandingSettlementsMinor: r.totalPayableMinor,
+      /**
+       * Net business position = money founders put in (capital + loans) − net business expenses (expenses − refunds), for the period.
+       * IMPLEMENTATION ASSUMPTION: the Product Plan names no such KPI formula. Reimbursed amounts are inside expenses (already paid out).
+       */
+      netBusinessPositionMinor: contributionsMinor + loansMinor - (expensesMinor - refundsMinor),
     },
     founders,
     charts: { contributionByFounder, expenseByCategory, monthly: monthlySeries },
+    /** Period flows per founder (founder-funded = expensePaid − reimbursementReceived). */
+    founderPeriod: result.founders.filter((f) => !founderId || f.founderId === founderId).map((f) => {
+      const p = periodByFounder.get(f.founderId) ?? { expenseShareMinor: 0, refundShareMinor: 0, expensePaidMinor: 0, reimbursementReceivedMinor: 0 };
+      const c = contribByFounder.get(f.founderId) ?? { contributionMinor: 0, loanMinor: 0 };
+      return { founderId: f.founderId, name: f.founderName, contributionMinor: c.contributionMinor, loanMinor: c.loanMinor, expensePaidMinor: p.expensePaidMinor, reimbursedMinor: p.reimbursementReceivedMinor,
+        founderFundedMinor: p.expensePaidMinor - p.reimbursementReceivedMinor, expenseShareMinor: p.expenseShareMinor, refundShareMinor: p.refundShareMinor, allocatedShareMinor: p.expenseShareMinor - p.refundShareMinor };
+    }),
     settlement: { recommendations, unresolvedMinor: r.unresolvedPayableMinor + r.unresolvedReceivableMinor },
     recent,
     counts: {
+      /** Every status, restricted to the period and filters (the work queue below is NOT period-filtered). */
+      byStatus: countBy(recentPool, (t) => t.status),
+      byType: countBy(recentPool, (t) => t.type),
       matchingTransactions: recentPool.length,
       notCountedYet: recentPool.filter((t) => !counted.has(t.id) && (t.status === 'draft' || t.status === 'pending_approval')).length,
     },
     reconciliation: { status: r.status, isBalanced: r.isBalanced, sumNetPositionMinor: r.sumGrossNetPositionMinor, businessBorneMinor: r.businessBorneMinor },
+    /** The approval work queue: all pending transactions, regardless of the selected period or filters. */
+    pendingApprovals: { count: txs.filter((t) => t.status === 'pending_approval').length },
     warnings: result.warnings.filter((w) => w.level === 'warning').length,
   };
 }

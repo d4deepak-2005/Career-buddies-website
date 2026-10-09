@@ -31,6 +31,9 @@ services:
         condition: service_healthy
     volumes:
       - receipts-data:/data/receipts
+      - branding-data:/data/branding
+      # Drop-in folder for the logo / founder photographs (see assets/README.md); read-only inside the container.
+      - ../assets:/app/assets:ro
     environment:
       NODE_ENV: ${NODE_ENV:-production}
       PORT: 4000
@@ -73,3 +76,4 @@ services:
 volumes:
   mongo-data:
   receipts-data:
+  branding-data:

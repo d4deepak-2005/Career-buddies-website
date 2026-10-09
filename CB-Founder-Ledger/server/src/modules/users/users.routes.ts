@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { Types } from 'mongoose';
 import { z } from 'zod';
 import { getEnv } from '../../config/env';
+import { audit } from '../../lib/audit';
 import { asyncHandler } from '../../lib/asyncHandler';
 import { AppError } from '../../lib/errors';
 import { PASSWORD_MIN_LENGTH, hashPassword } from '../../lib/password';
@@ -49,6 +50,7 @@ usersRouter.post('/', validate(createSchema), asyncHandler(async (req, res) => {
     role: body.role,
     passwordHash: await hashPassword(body.password, getEnv().BCRYPT_COST),
   });
+  await audit(req.auth!, { action: 'USER_CREATED', entityType: 'user', entityId: String(user._id), summary: `User created: ${user.email} (${user.role})`, after: { email: user.email, name: user.name, role: user.role } });
   res.status(201).json({ user: publicUser(user) });
 }));
 
@@ -61,7 +63,9 @@ usersRouter.patch('/:id', validate(idParams, 'params'), validate(updateSchema), 
   const update: Record<string, unknown> = { ...body };
   // Changing role/status invalidates existing refresh sessions.
   if (body.role || body.status === 'disabled') update['sessions'] = [];
+  const before = await User.findById(id).lean();
   const user = await User.findByIdAndUpdate(id, { $set: update }, { new: true, runValidators: true }).lean();
-  if (!user) throw AppError.notFound('User not found');
+  if (!user || !before) throw AppError.notFound('User not found');
+  await audit(req.auth!, { action: body.role || body.status ? 'PERMISSION_CHANGED' : 'USER_UPDATED', entityType: 'user', entityId: id, summary: `User updated: ${user.email}`, before: { name: before.name, role: before.role, status: before.status }, after: { name: user.name, role: user.role, status: user.status } });
   res.json({ user: publicUser(user) });
 }));

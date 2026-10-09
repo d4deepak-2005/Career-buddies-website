@@ -8,7 +8,7 @@ import { validate } from '../../middleware/validate';
 import { receiptsRouter } from '../receipts/receipts.routes';
 import { activeLinkedReimbursements, listReimbursableExpenses } from './reimbursements';
 import {
-  contentSchema, createSchema, idParams, listQuerySchema, patchSchema, previewSchema, reimbursableQuerySchema, versionOnlySchema, voidBodySchema,
+  contentSchema, createSchema, decisionBodySchema, idParams, listQuerySchema, patchSchema, previewSchema, reimbursableQuerySchema, versionOnlySchema, voidBodySchema,
   type TransactionContent,
 } from './transactions.schemas';
 import * as svc from './transactions.service';
@@ -48,9 +48,9 @@ transactionsRouter.get('/reimbursable-expenses', validate(reimbursableQuerySchem
 }));
 
 transactionsRouter.post('/', limitWrites, validate(createSchema), asyncHandler(async (req, res) => {
-  const { status, ...content } = req.body as z.infer<typeof createSchema>;
-  const tx = await svc.createTransaction(content, status, req.auth!);
-  res.status(201).json({ transaction: await one(String(tx._id)) });
+  const { status, clientRequestId, ...content } = req.body as z.infer<typeof createSchema>;
+  const tx = await svc.createTransaction(content, status, req.auth!, { clientRequestId });
+  res.status(tx.replayed ? 200 : 201).json({ transaction: await one(String(tx._id)), ...(tx.replayed ? { replayed: true } : {}) });
 }));
 
 transactionsRouter.get('/:id', validate(idParams, 'params'), asyncHandler(async (req, res) => {
@@ -77,6 +77,18 @@ transactionsRouter.patch('/:id', limitWrites, validate(idParams, 'params'), vali
 
 transactionsRouter.post('/:id/submit', limitWrites, validate(idParams, 'params'), validate(versionOnlySchema), asyncHandler(async (req, res) => {
   const tx = await svc.submitTransaction((req.params as { id: string }).id, (req.body as z.infer<typeof versionOnlySchema>).expectedVersion, req.auth!);
+  res.json({ transaction: await one(String(tx._id)) });
+}));
+
+// Approval workflow (Product Plan §11): any signed-in founder/admin may decide; self-approval follows Settings → Approval rules.
+transactionsRouter.post('/:id/approve', limitWrites, validate(idParams, 'params'), validate(decisionBodySchema), asyncHandler(async (req, res) => {
+  const b = req.body as z.infer<typeof decisionBodySchema>;
+  const tx = await svc.decideTransaction((req.params as { id: string }).id, b.expectedVersion, 'approved', b.comment, req.auth!);
+  res.json({ transaction: await one(String(tx._id)) });
+}));
+transactionsRouter.post('/:id/reject', limitWrites, validate(idParams, 'params'), validate(decisionBodySchema), asyncHandler(async (req, res) => {
+  const b = req.body as z.infer<typeof decisionBodySchema>;
+  const tx = await svc.decideTransaction((req.params as { id: string }).id, b.expectedVersion, 'rejected', b.comment, req.auth!);
   res.json({ transaction: await one(String(tx._id)) });
 }));
 

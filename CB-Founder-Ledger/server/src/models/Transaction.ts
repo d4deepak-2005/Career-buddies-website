@@ -32,6 +32,16 @@ const voidSchema = new Schema(
   { _id: false },
 );
 
+const decisionSchema = new Schema(
+  {
+    outcome: { type: String, enum: ['approved', 'rejected'], required: true },
+    by: { type: Schema.Types.ObjectId, ref: 'User', required: true },
+    at: { type: Date, required: true },
+    comment: { type: String, maxlength: 500 },
+  },
+  { _id: false },
+);
+
 const transactionSchema = new Schema(
   {
     /** Human-readable unique id, e.g. TXN-000042. */
@@ -62,6 +72,15 @@ const transactionSchema = new Schema(
     /** Denormalised count of receipts, for the list indicator. */
     receiptCount: { type: Number, required: true, default: 0, min: 0 },
     void: { type: voidSchema },
+    /** Approval / rejection record (who, when, optional comment). Set by the approval workflow only. */
+    decision: { type: decisionSchema },
+    /** Client-generated token that makes a double-submitted create idempotent (unique per creator). */
+    clientRequestId: { type: String, maxlength: 64 },
+    /** Recurring payment this transaction records, and the due date it covers. */
+    recurringId: { type: Schema.Types.ObjectId, ref: 'RecurringPayment' },
+    recurringDueDate: { type: String, maxlength: 10 },
+    /** `${recurringId}:${dueDate}` while the record is ACTIVE (draft/pending/approved); removed on void/reject. Unique => no duplicate occurrence. */
+    recurringKey: { type: String, maxlength: 64 },
     /** Optimistic-concurrency token; every edit must present the version it was based on. */
     version: { type: Number, required: true, default: 1 },
     createdBy: { type: Schema.Types.ObjectId, ref: 'User', required: true },
@@ -77,6 +96,8 @@ transactionSchema.index({ categoryId: 1, transactionDate: -1 });
 transactionSchema.index({ paidByFounderId: 1, transactionDate: -1 });
 transactionSchema.index({ createdBy: 1, createdAt: -1 });
 transactionSchema.index({ amountMinor: 1 });
+transactionSchema.index({ createdBy: 1, clientRequestId: 1 }, { unique: true, partialFilterExpression: { clientRequestId: { $type: 'string' } } });
+transactionSchema.index({ recurringKey: 1 }, { unique: true, partialFilterExpression: { recurringKey: { $type: 'string' } } });
 // Option C: all reimbursements of an expense (cap, void guard, calculation).
 transactionSchema.index({ reimbursesTransactionId: 1, status: 1 }, { sparse: true });
 // Phase 3: founder-involvement lookups for the founder ledger.

@@ -33,6 +33,9 @@ const schema = z
     CURRENCY_MINOR_UNITS: z.coerce.number().int().min(0).max(3).default(2),
     // Private receipt storage (local directory or Docker volume). Never served statically.
     RECEIPT_STORAGE_DIR: z.string().min(1).default('./data/receipts'),
+    // Private storage for brand/founder images managed from Settings (logo, founder photographs).
+    BRANDING_STORAGE_DIR: z.string().min(1).default('./data/branding'),
+    IMAGE_MAX_BYTES: z.coerce.number().int().min(1024).max(10 * 1024 * 1024).default(2 * 1024 * 1024),
     RECEIPT_MAX_BYTES: z.coerce.number().int().min(1024).max(25 * 1024 * 1024).default(5 * 1024 * 1024),
   })
   .superRefine((env, ctx) => {

@@ -53,7 +53,7 @@ describe('access control and input validation (1, 2, 19, 20, 21)', () => {
 describe('zero data (3, 14) and shape', () => {
   it('no transactions: honest zeros, empty lists, balanced', async () => {
     const d = await dash();
-    expect(d.kpis).toEqual({ totalInvestmentMinor: 0, founderCapitalMinor: 0, loansMinor: 0, totalBusinessExpensesMinor: 0, reimbursedByBusinessMinor: 0, founderFundedExpensesMinor: 0, refundsMinor: 0, settledMinor: 0, outstandingSettlementsMinor: 0 });
+    expect(d.kpis).toEqual({ totalInvestmentMinor: 0, founderCapitalMinor: 0, loansMinor: 0, totalBusinessExpensesMinor: 0, reimbursedByBusinessMinor: 0, founderFundedExpensesMinor: 0, refundsMinor: 0, settledMinor: 0, outstandingSettlementsMinor: 0, netBusinessPositionMinor: 0 });
     expect(d.charts).toEqual({ contributionByFounder: [], expenseByCategory: [], monthly: [] });
     expect(d.recent).toEqual([]);
     expect(d.settlement.recommendations).toEqual([]);

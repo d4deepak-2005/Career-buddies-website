@@ -6,6 +6,7 @@ import { AppError } from '../../lib/errors';
 import { authenticate } from '../../middleware/auth';
 import { validate } from '../../middleware/validate';
 import { idParams } from '../transactions/transactions.schemas';
+import { mountRecordSettlement } from './settlements.record';
 import { founderHistory, loadCalculation, recommendationsView, settlementSummary } from './financials.service';
 
 /** Read-only. All financial values are computed by the server; there is nothing a client can submit. */
@@ -33,6 +34,7 @@ founderFinancialsRouter.get('/:id/financial-position', authenticate, validate(id
 
 export const settlementsRouter = Router();
 settlementsRouter.use(authenticate);
+mountRecordSettlement(settlementsRouter);
 
 settlementsRouter.get('/recommendations', validate(noQuery, 'query'), asyncHandler(async (_req, res) => {
   const l = await loadCalculation();

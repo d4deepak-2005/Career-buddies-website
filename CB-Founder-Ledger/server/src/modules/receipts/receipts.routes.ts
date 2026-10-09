@@ -5,6 +5,7 @@ import multer from 'multer';
 import { z } from 'zod';
 import { getEnv } from '../../config/env';
 import { asyncHandler } from '../../lib/asyncHandler';
+import { audit } from '../../lib/audit';
 import { AppError } from '../../lib/errors';
 import { ALLOWED_EXTENSIONS, detectReceiptType, sanitizeFileName } from '../../lib/fileType';
 import { uploadRateLimiter } from '../../middleware/rateLimit';
@@ -86,6 +87,7 @@ receiptsRouter.post('/', limitUploads, validate(txParams, 'params'), asyncHandle
     });
     await Transaction.updateOne({ _id: id }, { $inc: { receiptCount: 1 } });
     await addReceiptRevision(tx, actor.id, { id: String(doc._id), fileName: doc.originalName });
+    await audit(actor, { action: 'RECEIPT_UPLOADED', entityType: 'transaction', entityId: id, summary: `Receipt attached to ${tx.txnNumber}`, after: { fileName: doc.originalName, sizeBytes: doc.sizeBytes } });
     res.status(201).json({ receipt: publicReceipt(doc.toObject(), actor.name) });
   } catch (err) {
     await storage.remove(storageKey).catch(() => undefined); // roll back the orphaned file
